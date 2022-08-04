@@ -1,0 +1,106 @@
+
+
+THINGS THAT NEED FIXED: do not rotate the lead off the ride, do not rotate clerk off clerk-valid position, 
+when determining break, make sure you check minor breaks, then adult breaks, then go with no break
+
+4.5.2022 update: added function to clean the lead position, but needs copied functionality to deal with clerks, perhaps at the same time
+added function to look through the employee list and return the employee object based off of name. Needs implemented everywhere that may 
+have a three-line for loop to locate an employee. 
+
+4.6.2022 update: added function to perform all the switching, but it is resulting in a problem with trying to subscript a null 
+in the clean_breaks finction when searching for the lead. UPDATE: the lead is being sent on break. Why? We told it not to do that!
+
+4.7.2022 Update: the break issue regarding leads has been resolved. If the lead is in the listm they are removed from it so they are never
+encountered again. Clean breaks still does not work, as there is an issue when the employees rotate, sending the wrong person on break, as they rotate based
+on the position of the next person in the employee_list. Consider adjusting that so the person sent on break is not rotated, and instead the index
+skips to the next person. And for the love of God please fix the print output, it is atrocious to read.
+
+4.7.2022 Night update: Clean breaks has been repared and lead swapping functionality should work. Now we must implement it for the clerks, whilst ensuring that
+we account for the fact that there may be more than one clerk, and not swapping clekrs that were already swapped or employees going on break. Output is still atrocious to read
+
+4.18.2022 Update: The next rotation function now works for one iteration, but when it is called again it throws errors. There is a function in place to return everyone who goes on break.
+It sets them to a temporary optional position, which will presumably then be removed or manually renamed. An issue was resolved where the function was attempting to pop the lead
+off the breaks list once the lead had already been popped. Issue has been resolved. Current issue is in clean_rotation - the function is having difficulty locating the leads position. Reason unknown
+
+4.21.22 update. Crazy close. Just need to create the greater than or equal to comprison for time and this should be working. Had an issue where 2 invaliud positions were getting swapped, 
+this was repaired with the mess that is line 243, which verifies a clerk can never be swapped in the lead swapping area. Fixed an error where the value '1' was getting appended to the end of the break list 
+ever time at index -1. That is now popped every run.
+
+4.23.22 update: the program does work rortationally with breaks. Next orders of business - it needs to identify when the end of day is. It needs to identify when then end of someones shift is, 
+then give the user the option to pull the position if possible, or add a new employee to replace them. Needs to actually check and see on each next_rotation call if the breaks are going to be possible
+and warn the user if they are not. Must have added functionality to add or remove employees or positions at will. Remember that whenever yo add an employee, you will need to recalculate break list. whenever
+you need to remove a position, refer to how it is done when someone goes on break and ADA gets removed. Currently workin on trying to figure out a violation time for the minor. One option is adding 5 hours past start of shift.
+The other is adding 5 hours past end of break, while ensuring that the entire shift length does not exceed 9.5 hours. To do this, modify the employee object to have a field for the end of break, use a setter to set it when breaks end.
+and use a getter to access it when you need to reference it to do the 5 gours calculation. 
+
+4.24.22  update: I added functionality to identify violation time and present the three options. Acknwledge option has been implemented, and the issues
+will be presented again on the next time a new rotation is needed. Subtract position and add employee have not been implemented
+
+4.25.22 update: I added functionality for trying to remove a position when already at mins, removing the only optional position available, or removing an optional position from a list
+of choices. Next order: adding an employee to replace the one that is leaving. After that, let's format output so this all looks pretty, then add the option of removing/adding an employee at will. 
+Then, after that, we can add the logic for checking if breaks are going to be possible or not. (Oh boy!)
+
+4.27.22 update: I have added the functionality to add a person to replace the onbe going on break. Theoretically, this code coudl be copy/pasted to form the "add a person" functionality
+It has not been fully tested, but at the moment all appears well. Next step is to formate output, because it really is atrocious to read. Let's get this thing show ready, then we can worry about the extras.
+
+4.28.22 update: Added functionality to find an employee by name and print the full details for them. Cleaned up the output, please try to keep it that way. Next items:
+change employee names so that they do not include spaces in them. Adjust instructions to ensure no one enters a name with a space in it. Do a full run. Add functionality for adding/removing an employee 
+Then add functionality for calculating break feasibility
+
+4.30.22 update: Added functionality to add and remove an employee at will. Began to implement break checking logic. At this point, the program checks and sees the earliest times anyone could take thier breaks
+then determines if there is enough people to cover everyone at their earliest. It does not consider what would happen if not everyone goes at the earliest time. If everyone goes at earliest, it return true, no more thinking
+needed. Otherwise, it prints out a message. It should instead try adding ROTATION_LENGTH minutes to their time to see if they can be moved later and stay in the window, and if so, adjust the counter_dict to reflect that and check again
+
+5.24.22 update: added idiot checks for all inputs, though some may still result in an infinite loop (use and, not or). Added functions to create each north lead ride. Now, when you enter a recognised ride name
+at the start of theprogram, it asks if you would like to use the preset ride. This creates all the positions, then continues to ask about times, operator names, etc. Next order of business is the feasibility check
+
+6.8.22 upadate: Added functionality to read all operator info from a CSV file. Greatly speeds up the process. Program can now be ready to run in less than 1 minute.
+
+6.27.22 update: fixed a few bugs with how clerks are handled during initial setup, as well as with how the breaks list is calculated (there was a random pop(-1) for
+no apparent reason). Began to implement the feasibility_check. Right now it checks if it is possible to do every minor break at the earlies possible time. 
+In the future, it needs to identify if it possible to do them at later times. See comments on lines 755-757 for implementation details
+test2.csv is a duplicate of test1.csv. Both will result in violations because they are staffed at mins and can cover no breaks
+You can copy the text below and paste it into the terminal during the run to spare yourself the tedious typing
+
+7.1.22 update: the feasibility check should now work correctly, though it has not been tested on a configuration that creates a violation (besides no extras)
+Things to consider: cleanup the code and add additional comments to improve readibility for others (Tino?). Add an option for when parsing the
+csv file to add positions as well. Perhaps have a - character on a line, then everything below that is a position we want to add. 
+Test configurations: starting with a violation (many minors, few adults), starting with a violation but fixing it (people show up), starting with no violation, but creating one(dropping down to mins or sofew extras that 
+we create a violation), other rides.
+Add instructions when entering data manually to make the leads name 'lead'
+Start a complete writeup of the program
+
+
+7.3.22 update: added comments up until line 131. No actual changes to the code
+current test config
+
+7.5.22 update: added comments to line 231. Fixed bugs involving the removal of employees when their shift ends and how it affects the 
+feasibility check. The check was causing issues because there was not enough time left in the day to give them a break. Also fixed a bug 
+where rotations were going one past the end of the park day. Known bug: trying to remove an employee who is currently on break will result 
+in them not being found. Testing congfiguration has been moved to a seperate text file
+
+7.12.22 update: finished commenting on the CLI at line 106. Finished commenting the red_tag program.  Fixed bugs in the 
+adjustments function so that it doesn't run the index out of bounds. TODO: handle the error anytime employees are removed so that if 
+and employee is on break, it just lets the user know and allows them to enter another name (put it in an idiot loop)
+
+7.22.22 update: continued to test. Fixed a multitude of bugs involving where the lead starts on the first rotation. Added ANSI color coding
+to many outputs to make it look pretty. Next step is continued testing. 
+-----------------------
+
+
+laff trakk
+y
+11:00
+19:00
+y
+test1.csv
++
+minor3
+17
+n
+10:30
+18:30
+ada
+n
+y
+n
