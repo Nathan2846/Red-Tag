@@ -160,6 +160,12 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
     while csv_option.lower() != 'y' and csv_option.lower() != 'n':
         csv_option = input('\033[33mWould you like to input employee data from a csv file? Please enter y or n\033[0m')
     
+    # Identify positions clerks can't do
+    no_clerks = []
+    positions = {**ride.get_pos_dict(), **ride.get_optional_pos_dict()}
+    for p in positions:
+        if not positions[p][2]:
+            no_clerks.append(p.lower())
     #If they are reading from CSV, get the name of the file
     if csv_option.lower() == 'y':
         file_name = input('Please enter the name of the CSV file you would like to read data from')
@@ -177,6 +183,11 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
 
                         #Reassemble the untrained positions
                         line[4] = line[4:]
+
+                        # Add non-clerk positions if needed 
+                        if int(line[1]) < 16:
+                            line[4] += no_clerks
+                        
                         current.set_untrained_positions(line[4]) # Add the untrained positions
                         employee_list.append(current)
                         #If we have more employees than positions, break out
@@ -200,6 +211,7 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
     if iterations != number_positions and iterations != 0:
         print('\033[31mThere were not enough employees listed in the CSV file to fill all positions. You need an additional ', iterations, 'people. Please enter their info manually\033[0m')
 
+
     #If we need more employees, proceed to enter them manually
     #If the csv option is not used iterations will equal number of positions
     for _ in range(iterations):
@@ -216,6 +228,11 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
 
         # Add any positions they should avoid
         avoid_list = []
+
+        # Make sure to add all non-clerk positions 
+        if age < 16:
+            avoid_list = no_clerks
+
         avoid_pos = input('Are there any positions that this person is not trained on? Please enter one position per line or press enter to continue: ')
         while avoid_pos != '':
             avoid_list.append(avoid_pos)
@@ -314,16 +331,16 @@ def begin_rotation(employee_list, ride, position_availability):
     pos_dict = ride.get_pos_dict()
     optional_pos_dict = ride.get_optional_pos_dict()
     all_positions_list = list(pos_dict.keys()) + list (optional_pos_dict.keys())
-    all_positions_dict = {**pos_dict, **optional_pos_dict}
 
-    # Iterate through the position availability
-    for tightness in range(1,len(all_positions_list)):
+    for tightness in range(1,len(all_positions_list)+1):
+        print ("Current tightness", tightness)
         for position in all_positions_list: # We can do all positions now b/c we know we have enough to cover mandatory and optional
-            if len(all_positions_dict[position]) == tightness: # It is currently time to work on this position
+            if len(position_availability[position.lower()]) == tightness: # It is currently time to work on this position
                     for candidate in employee_list:
-                        if candidate.get_pos() is None and candidate.get_name() in position_availability[position.lower()]:
-                            # Time to set them here 
+                        if candidate.get_pos() == None and candidate.get_name() in position_availability[position.lower()]:
+                            # Time to set them here
                             change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, position)
+                            break
 
 
 def next_rotation(employee_list, ride, break_list, p_start, p_end):
