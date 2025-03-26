@@ -2,6 +2,8 @@ import red_tag_classes
 import red_tag_CLI
 import red_tag_test_utils
 import csv
+
+import ast
 """
 This is red_tag. It will simulate the job of a red tag by creating a rotation at a specified ride
 It will take into account minor breaks, violations, and a relatively fair rotation
@@ -32,7 +34,7 @@ def gather_ride_data():
     #Get a value for mins
     while True:
         try:
-            mins = int(input('PLease enter the minimum number of people required to operate this ride:'))
+            mins = int(input('Please enter the minimum number of people required to operate this ride:'))
             break
         except ValueError:
             print ("Please enter a number")
@@ -166,12 +168,16 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
                 csv_reader = csv.reader(csv_file)
                 switchover = False
                 for line in csv_reader:
-                    if switchover:
+                    if not switchover:
                         #Split the shift start and end times into tokens 
                         e_start = line[2].split(':')
                         e_end = line[3].split(':')
                         #Create a new employee object using the data in the line. Create a new Time object for shift start/end 
                         current = red_tag_classes.Employee(line[0],line[1], red_tag_classes.Time(int(e_start[0]),int(e_start[1])), red_tag_classes.Time(int(e_end[0]), int(e_end[1])))
+
+                        #Reassemble the untrained positions
+                        line[4] = line[4:]
+                        current.set_untrained_positions(line[4]) # Add the untrained positions
                         employee_list.append(current)
                         #If we have more employees than positions, break out
                         if len(employee_list) > len(ride.get_pos_dict()) + len(ride.get_optional_pos_dict()):
@@ -184,7 +190,7 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
                             continue
                         ride.add_pos_csv(line[0], line[1], line[2])
 
-        except:
+        except FileNotFoundError:
             print ('\033[31mFile not found! Please enter data manually\033[0m')
 
     #Determine if we need to add more employees manually
@@ -208,6 +214,14 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
             except ValueError:
                 print('\033[31mPlease enter a value\033[0m')
 
+        # Add any positions they should avoid
+        avoid_list = []
+        avoid_pos = input('Are there any positions that this person is not trained on? Please enter one position per line or press enter to continue: ')
+        while avoid_pos != '':
+            avoid_list.append(avoid_pos)
+            avoid_pos = input('Are there any positions that this person is not trained on? Please enter one position per line or press enter to continue: ')
+        
+ 
         #Idiot check loop to make sure they enter y or n for entire day question
         shift_start_q = ''
         while shift_start_q.lower() != 'y' and shift_start_q.lower() != 'n':
@@ -215,7 +229,6 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
         if shift_start_q == 'Y' or shift_start_q == 'y':
             #Creates an employee object with shift time half hour before open to half hour past close
             current = red_tag_classes.Employee(name, age, p_start.subtract(red_tag_classes.Time(0,30)), p_end.add(red_tag_classes.Time(0,30)))
-            employee_list.append(current)
         else:
 
             #Idiot check loop to ensure they enter a valid time format for start
@@ -232,13 +245,42 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
             e_end = e_end.split(':')
             e_end = red_tag_classes.Time(int(e_end[0]), int(e_end[1])) #Put the impout into a time object
             current = red_tag_classes.Employee(name, age, e_start, e_end) #Create an employee object with all the info we just collected
-            employee_list.append(current) #Add the new employee to the list
+        
+        current.set_untrained_positions(avoid_list) # Set the untrained positions
+        employee_list.append(current) #Add the new employee to the list
+
+
+    #TODO: Get ride of this code
+    calculate_position_availability(employee_list, ride)
+
+        
 
     #Find the lead and make sure they are marked as not needing a break. 
+    # TODO: Create lead break logic - if 2 leads are present they can break themselves, but gotta make sure at least 1 is present at all times
     lead = find_employee_in_list(employee_list, 'Lead')
     lead.set_break_status(True)
     return employee_list
+
+
+def calculate_position_availability(employee_list, ride):
+    #Begin by getting all positions in one list
+    all_positions = list(ride.get_pos_dict().keys()) + list(ride.get_optional_pos_dict().keys())
+
+    position_availability = {}
+    # Determine List of employees for each positions. Create a dictionary where the key is the position
+    # and the value is the list of employees that can do it
+
+    for position in all_positions:
+        position_availability[position.lower()] = []
+        for employee in employee_list:
+            if position.lower() not in employee.get_untrained_positions():
+                position_availability[position.lower()].append(employee.get_name())
+
     
+    return position_availability
+
+
+
 """
 This function returns a list of all the breaks that need completed in order
 """
@@ -267,54 +309,23 @@ def make_break_list(employee_list, number_positions):
 
     return return_list
 
-def begin_rotation(employee_list, ride):
+def begin_rotation(employee_list, ride, position_availability):
     #Grab some variables we will need throughout the function
     pos_dict = ride.get_pos_dict()
     optional_pos_dict = ride.get_optional_pos_dict()
+    all_positions_list = list(pos_dict.keys()) + list (optional_pos_dict.keys())
+    all_positions_dict = {**pos_dict, **optional_pos_dict}
 
-    for position in pos_dict: #Loop through all the positions we need to fill
-        if pos_dict[position][0] == None:
+    # Iterate through the position availability
+    for tightness in range(1,len(all_positions_list)):
+        for position in all_positions_list: # We can do all positions now b/c we know we have enough to cover mandatory and optional
+            if len(all_positions_dict[position]) == tightness: # It is currently time to work on this position
+                    for candidate in employee_list:
+                        if candidate.get_pos() is None and candidate.get_name() in position_availability[position.lower()]:
+                            # Time to set them here 
+                            change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, position)
 
-            #This is a position that needs to be filled
-            empty_pos = pos_dict[position]
-            clerk_permit = empty_pos[2]
 
-
-            if clerk_permit:
-                #We need to see if there are any clerks and then fill the pos with the clerk
-                set = False #A variable used to determine if a clerk is used to fill the position
-                for employee in employee_list:
-                    if employee.get_age() == '15' and employee.get_pos() == None:
-                        #Winner - There is a clerk who needs a position
-                        change_position(employee_list, pos_dict, optional_pos_dict, employee.get_name(), None, position )
-                        set = True
-                        break
-                if not set:
-                    #We gave gone through the list, we have no clerks left with no position. Assign an adult to the position
-                    for employee in employee_list:
-                        employee_age = employee.get_age()
-                        if (employee.get_pos() == None and employee_age != '15' and employee.get_name().lower() != 'lead'): 
-                            change_position(employee_list, pos_dict, optional_pos_dict, employee.get_name(), None, position)
-                            break
-                
-            #Otherwise we can just fill it with anyone
-            if not clerk_permit:
-                for employee in employee_list:
-                    employee_age = employee.get_age()
-                    if (employee.get_pos() == None and employee_age != '15'): 
-                        if employee.get_name().lower() == 'lead' and not pos_dict[position][1]:
-                            continue
-                        else:
-                            change_position(employee_list, pos_dict, optional_pos_dict, employee.get_name(), None, position)
-                            break
-    
-    #We have now filled all mandatory positions. Time for optionals
-    optional_list = list(ride.get_optional_pos_dict())
-    current = 0 #The index of the optional_List we are filling
-    for employee in employee_list:
-        if employee.get_pos() == None:
-            change_position(employee_list, pos_dict, optional_pos_dict, employee.get_name(), None, optional_list[current])
-            current +=1
 def next_rotation(employee_list, ride, break_list, p_start, p_end):
     #Increase time for next rotation
     ride.set_current_time(ride.get_current_time().add(red_tag_classes.Time(0,ROTATION_LENGTH)))

@@ -71,13 +71,16 @@ def main():
             ride.set_current_time(p_start) #Set thet time to the start of the park
             employee_list = red_tag.gather_employee_data(number_positions, p_start, p_end, ride)
             break_list = red_tag.make_break_list(employee_list, number_positions)
+            position_availability = red_tag.calculate_position_availability(employee_list, ride)
+
         if (data[0]):
             #Take all data from the testing configuration
             ride, number_positions, p_start, p_end, employee_list, break_list= data[1], data[2], data[3], data[4], data[5], data[6]
+            position_availability = red_tag.calculate_position_availability(employee_list, ride)
 
 
         #Get started and print the first rotation
-        red_tag.begin_rotation(employee_list, ride)
+        red_tag.begin_rotation(employee_list, ride, position_availability)
         red_tag.print_ride(ride)
 
         #Prepare to enter main loop
@@ -90,7 +93,13 @@ def main():
         #Enter the main loop
         while(command != 'q'): #As long as the user doesn't ask to quit, keep going
             command_tokens = command.split() #Tokenize the command
-            command = command_tokens[0] #The first thing entered will always be the command
+             
+            if not command_tokens:
+                command = 'h' #If no command is entered, display help
+            else:
+                command = command_tokens[0] #The first thing entered will always be the command
+
+
 
             if ride.get_current_time() == p_end or ride.get_current_time() > p_end: #If the day is over, end the program
                 print ("The day is over, thank you for being here, have a great night!")

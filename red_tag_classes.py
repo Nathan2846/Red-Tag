@@ -67,7 +67,7 @@ class Time:
         return self.__minutes * self.__hours
 
 class Employee:
-    __slots__ = ['__name','__age','__shift_start','__shift_end','__break_status', '__break_window', '__pos', '__break_end']
+    __slots__ = ['__name','__age','__shift_start','__shift_end','__break_status', '__break_window', '__pos', '__break_end', '__untrained_positions']
     def __init__(self, name, age, start, end):
         self.__name = name
         self.__age = age
@@ -103,7 +103,11 @@ class Employee:
         else:
             result += self.__name + " has not gone on break yet \n" + "Break window: " + str(self.__break_window[0]) + '-' + str(self.__break_window[1]) + '\n'
         
-        result += "Current position: " + self.__pos + '\n'
+        try:
+            result += "Current position: " + self.__pos + '\n'
+        except TypeError:
+            # Positions not set
+            result += "Current position : Unset"
         return result
 
     def __str__(self):
@@ -131,6 +135,10 @@ class Employee:
         return self.__break_end
     def get_shift_start(self):
         return self.__shift_start
+    def set_untrained_positions(self, value):
+        self.__untrained_positions = value
+    def get_untrained_positions(self):
+        return self.__untrained_positions
     
 
 class Ride:
