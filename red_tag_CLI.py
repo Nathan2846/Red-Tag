@@ -12,13 +12,13 @@ def testing():
 
     #Create a ride object with 7 positions for Laff Trakk
     ride = red_tag_classes.Ride('Laff Trakk',7)
-    ride.add_to_dict('Load', [None, True, False])
-    ride.add_to_dict('Unload', [None, True, False])
-    ride.add_to_dict('Dispatch', [None, True, False])
-    ride.add_to_dict('Operate', [None, True, False])
-    ride.add_to_dict('Grouper', [None, False, False])
-    ride.add_to_dict('Merger', [None, False, True])
-    ride.add_to_dict('Frontline', [None, False,True])
+    ride.add_to_dict('load', [None, True, False])
+    ride.add_to_dict('unload', [None, True, False])
+    ride.add_to_dict('dispatch', [None, True, False])
+    ride.add_to_dict('operate', [None, True, False])
+    ride.add_to_dict('grouper', [None, False, False])
+    ride.add_to_dict('merger', [None, False, True])
+    ride.add_to_dict('frontline', [None, False,True])
     number_positions = 9
     ride.set_current_time(p_start)
 
@@ -82,6 +82,7 @@ def main():
         #Get started and print the first rotation
         red_tag.begin_rotation(employee_list, ride, position_availability)
         red_tag.print_ride(ride)
+        exit()
 
         #Prepare to enter main loop
         print("Ride has been successfully created. You may now enter the following commands. \n Press e to get a full readout of employee data. \n"
@@ -113,7 +114,7 @@ def main():
                 #Print out te full detailed employee list
                 red_tag.print_employee_list(employee_list)
             elif command == 'n':
-                print_rotation_result = red_tag.next_rotation(employee_list, ride, break_list, p_start, p_end)
+                print_rotation_result = red_tag.next_rotation(employee_list, ride, break_list, p_start, p_end, position_availability)
                 try:
                     if print_rotation_result[0]:
                         break_list = print_rotation_result[1]

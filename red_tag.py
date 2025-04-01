@@ -62,6 +62,7 @@ It will then add the positions specific for that ride. Only mandatory positions 
 The ride and its min value are then returned
 Only one of these is called on a run (or zero if a ride is entered manually)
 """
+# TODO: Go back and lowercase all positions
 def set_ferris_wheel():
     ride = red_tag_classes.Ride('Wheel',3)
     ride.add_to_dict('Load', [None, False, False])
@@ -70,13 +71,13 @@ def set_ferris_wheel():
     return ride, 3
 def set_laff_trakk():
     ride = red_tag_classes.Ride('Laff Trakk', 7)
-    ride.add_to_dict('Load', [None, True, False])
-    ride.add_to_dict('Unload', [None, True, False])
-    ride.add_to_dict('Dispatch', [None, True, False])
-    ride.add_to_dict('Operate', [None, True, False])
-    ride.add_to_dict('Grouper', [None, False, False])
-    ride.add_to_dict('Merger', [None, False, True])
-    ride.add_to_dict('Frontline', [None, False,True])
+    ride.add_to_dict('load', [None, True, False])
+    ride.add_to_dict('unload', [None, True, False])
+    ride.add_to_dict('dispatch', [None, True, False])
+    ride.add_to_dict('operate', [None, True, False])
+    ride.add_to_dict('grouper', [None, False, False])
+    ride.add_to_dict('merger', [None, False, True])
+    ride.add_to_dict('frontline', [None, False,True])
     return ride, 7
 def set_racer():
     ride = red_tag_classes.Ride("Lightning Racer" , 6)
@@ -326,24 +327,89 @@ def make_break_list(employee_list, number_positions):
 
     return return_list
 
+def training_check (position_availability, print_errors):
+    # Determine if there are any issues with training
+    for position, people in position_availability.items():
+        if len(people) == 0:
+            # Fail
+            if print_errors:
+                print (f'There are no people trained at {position} - exiting')
+                return False
+        if len (people) == 1:
+            if print_errors:
+                print (f'There is only one person trained at {position}')
+    
+    return True
+
+# TODO: The logic between this and next rortation is now almost identical
+# Should we rename this function and add a parameter for when it is first rotation
+# If it is first rotation, we would be looking for people with unset position
+# For next rortation, we are looking that position does not equal current
+
 def begin_rotation(employee_list, ride, position_availability):
     #Grab some variables we will need throughout the function
     pos_dict = ride.get_pos_dict()
     optional_pos_dict = ride.get_optional_pos_dict()
     all_positions_list = list(pos_dict.keys()) + list (optional_pos_dict.keys())
 
-    for tightness in range(1,len(all_positions_list)+1):
-        print ("Current tightness", tightness)
-        for position in all_positions_list: # We can do all positions now b/c we know we have enough to cover mandatory and optional
-            if len(position_availability[position.lower()]) == tightness: # It is currently time to work on this position
-                    for candidate in employee_list:
-                        if candidate.get_pos() == None and candidate.get_name() in position_availability[position.lower()]:
-                            # Time to set them here
-                            change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, position)
-                            break
+    temp_position_availability = position_availability.copy()
 
+    for _ in range(len(all_positions_list)): # This is how many positions we have to assign, no matter what
+        for tightness in range(1, len(all_positions_list) +1):
+            current_position = None
+            for position in all_positions_list:
+                if len(temp_position_availability[position.lower()]) == tightness:
+                    # We have found our psosition to work on, break out of all loops except main one
+                    current_position = position.lower()
+                    break
+            if current_position != None:
+                print (f' Current position has been chosen as {current_position}')
+                break
+        # Having found the position, lets deal with it
+        for candidate in employee_list:
+            if candidate.get_pos()  == None and candidate.get_name() in temp_position_availability[position.lower()]:
+                # Set them
+                change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, position)
 
-def next_rotation(employee_list, ride, break_list, p_start, p_end):
+                # Remove this employee from everywhere else in the temp availability - they are no longer available
+                for position , people in temp_position_availability.items():
+                    if candidate.get_name() in people:
+                        temp_position_availability[position].remove(candidate.get_name())
+                
+                # Remove the position from all_positions_list - it cannot be set twice
+                all_positions_list.remove(current_position)
+                break # Move on 
+
+def do_breaks(optional_pos_dict, break_occuring, break_list, employee_list, pos_dict):
+    optional_positions_list = list(optional_pos_dict)
+    for i in range(break_occuring):
+        #Lets determine who gets to go on break
+        index = 0
+        time = break_list[index].get_break_window()[0]
+        if (int(break_list[index].get_age()) >= 18):
+            #If the first perosn in the brak list is not a minor, make sure there is not a minor that should be going at this time
+            for j in range(len(break_list)):
+
+                if int(break_list[j].get_age()) < 18 and break_list[j].get_break_window()[0] < ride.get_current_time():
+                    #A minor should go instead - they always have the highest priority
+                    index = j
+                    break
+
+        #Get all the info
+        position_to_fill = break_list[index].get_pos() #The position of the person who is aboyut to go on break that will need filled
+        position_to_vacate = optional_positions_list[i] #The position that will be pulled to cover break
+        person_to_break = break_list[index] #An employee object
+        person_to_fill = optional_pos_dict[position_to_vacate][0] #A name 
+
+        change_position(employee_list, pos_dict, optional_pos_dict, person_to_break.get_name(), None, "Break") #Send the person to break
+        change_position(employee_list, pos_dict, optional_pos_dict, person_to_fill, None, position_to_fill ) #Have the person filling fill the spot
+
+        optional_pos_dict[position_to_vacate][0] = None #Empty the old position
+        person_to_break.set_break_status(True) #Update the person's status
+        break_list.pop(index) #Get them off the break list
+        print('\033[33m',person_to_break.get_name() + " is going on break now\033[0m") #Notify the user
+
+def next_rotation(employee_list, ride, break_list, p_start, p_end, position_availability):
     #Increase time for next rotation
     ride.set_current_time(ride.get_current_time().add(red_tag_classes.Time(0,ROTATION_LENGTH)))
 
@@ -359,6 +425,7 @@ def next_rotation(employee_list, ride, break_list, p_start, p_end):
 
     #If anyone is on break, take them off break and assign them a random position in optional.
     #They may possibly be pulled before the rotation is printed to accomodate the next break
+    #It doesn't matter if they are trained there, they are about to get pulled or rotated anyways
     print("\n\n\n")
     for employee in employee_list:
         if employee.get_pos() == "Break":
@@ -372,11 +439,13 @@ def next_rotation(employee_list, ride, break_list, p_start, p_end):
                     break
 
     #First priority is to send people home if needed
+    #TODO: Add training check logic to this function
     send_people_home_result = send_people_home(employee_list, ride, break_list, p_start, p_end)
     if send_people_home_result[0]:
         break_list = send_people_home_result[1] #Update the break list if needed from the send_people_home function
     
     #Perform feasibility check - determines if there are any violations
+    #TODO: Add logic to feasibility check to make sure you aren't sending home/on break the one person who is trained at a position
     feasibility_result = feasibility_check(employee_list, break_list, pos_dict, optional_pos_dict, ride, p_start, p_end)
     if not feasibility_result[0]:
         #There will be some violations at some point
@@ -402,49 +471,44 @@ def next_rotation(employee_list, ride, break_list, p_start, p_end):
             break
 
     #If it is possible, send the person on break and remove the from the break list
+    #TODO: Debug this code
+    #Parameterise it so when the "IGGNORE" parameter is passed, it ignores that person and finds the next person
     if break_occuring >0:
-        optional_positions_list = list(optional_pos_dict)
-        for i in range(break_occuring):
-            #Lets determine who gets to go on break
-            index = 0
-            time = break_list[index].get_break_window()[0]
-            if (int(break_list[index].get_age()) >= 18):
-                #If the first perosn in the brak list is not a minor, make sure there is not a minor that should be going at this time
-                for j in range(len(break_list)):
+       do_breaks(optional_pos_dict, break_occuring, break_list, employee_list, pos_dict)
 
-                    if int(break_list[j].get_age()) < 18 and break_list[j].get_break_window()[0] < ride.get_current_time():
-                        #A minor should go instead - they always have the highest priority
-                        index = j
-                        break
+    # #Third priority is rotating all remaing employees
+    # #TODO: Add training logic here
+    # first_pos = employee_list[0]
+    # for i in range(len(employee_list)):
+    #     current_pos = employee_list[i].get_pos()
+    #     if current_pos == "Break": #Don't rotate people on break
+    #         continue
+    #     try:
+    #         next_employee = employee_list[i+1] #Try to move them one down the list
+    #     except:
+    #         next_employee = first_pos #Unless you are at the end of the list, in that case, go back to the start
+    #     if next_employee.get_pos() == "Break":
+    #         continue
 
-            #Get all the info
-            position_to_fill = break_list[index].get_pos() #The position of the person who is aboyut to go on break that will need filled
-            position_to_vacate = optional_positions_list[i] #The position that will be pulled to cover break
-            person_to_break = break_list[index] #An employee object
-            person_to_fill = optional_pos_dict[position_to_vacate][0] #A name 
+    #     change_position(employee_list, pos_dict, optional_pos_dict, employee_list[i].get_name(), next_employee.get_name(), None) #Perform the swap
+    all_positions_list = list(pos_dict.keys()) + list (optional_pos_dict.keys())
 
-            change_position(employee_list, pos_dict, optional_pos_dict, person_to_break.get_name(), None, "Break") #Send the person to break
-            change_position(employee_list, pos_dict, optional_pos_dict, person_to_fill, None, position_to_fill ) #Have the person filling fill the spot
+    for tightness in range(1,len(all_positions_list)+1):
+        for position in all_positions_list: # We can do all positions now b/c we know we have enough to cover mandatory and optional
+            if len(position_availability[position.lower()]) == tightness: # It is currently time to work on this position
+                    for candidate in employee_list:
+                        if tightness == 1:
+                            # They cant rotate because they are the only ones trained there
+                            continue
+                        try:
+                            if candidate.get_pos().lower() != position.lower() and candidate.get_name() in position_availability[position.lower()]:
+                                # Time to set them here
+                                change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, position) #TODO: Inspect this line if it causes multiple peole at the same position
+                                break
+                        except:
+                            print (candidate.get_name(), candidate.get_pos())
+                            continue
 
-            optional_pos_dict[position_to_vacate][0] = None #Empty the old position
-            person_to_break.set_break_status(True) #Update the person's status
-            break_list.pop(index) #Get them off the break list
-            print('\033[33m',person_to_break.get_name() + " is going on break now\033[0m") #Notify the user
-
-    #Third priority is rotating all remaing employees
-    first_pos = employee_list[0]
-    for i in range(len(employee_list)):
-        current_pos = employee_list[i].get_pos()
-        if current_pos == "Break": #Don't rotate people on break
-            continue
-        try:
-            next_employee = employee_list[i+1] #Try to move them one down the list
-        except:
-            next_employee = first_pos #Unless you are at the end of the list, in that case, go back to the start
-        if next_employee.get_pos() == "Break":
-            continue
-
-        change_position(employee_list, pos_dict, optional_pos_dict, employee_list[i].get_name(), next_employee.get_name(), None) #Perform the swap
 
     clean_rotation(employee_list, ride) #Make sure clerks aren't operating, leads aren't clerking, etc.
 
