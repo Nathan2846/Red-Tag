@@ -80,14 +80,13 @@ def main():
 
 
         #Get started and print the first rotation
-        red_tag.begin_rotation(employee_list, ride, position_availability)
+        red_tag.rotate(employee_list, ride, position_availability, True)
         red_tag.print_ride(ride)
-        exit()
 
         #Prepare to enter main loop
         print("Ride has been successfully created. You may now enter the following commands. \n Press e to get a full readout of employee data. \n"
         " Press n to get the next rotation. \n Press q to quit. \n Press + to add another employee. \n Press - <name> to remove an employee. \n Press r to fully reset and start over again. \n Press h to get this list of commands again."
-        "\n Press f <employee name> to locate an employee and print out their current status")
+        "\n Press f <employee name> to locate an employee and print out their current status. \n Press t <employee> <position> to train an employee on a position")
 
         command = input("Please enter your first command: ")
         command = command.lower()
@@ -109,7 +108,32 @@ def main():
                 #Print the help menu
                 print("\n Press e to get a full readout of employee data. \n",
                 " Press n to get the next rotation. \n Press q to quit. \n Press + to add another employee. \n Press - <name> to remove an employee. \n Press r to fully reset and start over again. \n Press h to get this list of commands again."
-                "\n Press f <employee name> to locate an employee and print out their current status")
+                "\n Press f <employee name> to locate an employee and print out their current status. \n Press t <employee> <position> to train an employee on a position")
+            elif command == 't':
+                # Train an employee
+                if len(command_tokens) != 3:
+                    print ('Please enter the command in the form t <employee> <position>')
+                else:
+                    employee_name, position = command_tokens[1], command_tokens[2]
+
+
+                    
+                    # Find the employee object 
+                    employee_object = red_tag.find_employee_in_list(employee_list,  employee_name)
+                    if employee_object == None:
+                        print ('Employee not found')
+                        continue
+
+                    # Train them
+                    before = len(employee_object.get_untrained_positions())
+                    employee_object.train_on_position(position.lower())
+                    after = len(employee_object.get_untrained_positions())
+
+                    # Confirm
+                    if before == after:
+                        print ('Position not found or employee is already trained at this position')
+                    else:
+                        print (f'{employee_name} has been succesfully trained at {position}')
             elif command == 'e':
                 #Print out te full detailed employee list
                 red_tag.print_employee_list(employee_list)

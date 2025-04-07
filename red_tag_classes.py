@@ -67,8 +67,8 @@ class Time:
         return self.__minutes * self.__hours
 
 class Employee:
-    __slots__ = ['__name','__age','__shift_start','__shift_end','__break_status', '__break_window', '__pos', '__break_end', '__untrained_positions']
-    def __init__(self, name, age, start, end):
+    __slots__ = ['__name','__age','__shift_start','__shift_end','__break_status', '__break_window', '__pos', '__break_end', '__untrained_positions', '__is_lead']
+    def __init__(self, name, age, start, end, is_lead):
         self.__name = name
         self.__age = age
         self.__shift_start = start
@@ -77,6 +77,7 @@ class Employee:
         self.__break_window = []
         self.__pos = None
         self.__break_end = None
+        self.__is_lead = is_lead # Make sure this is boolean when you pass it in
 
         #We will now compute the break window. It begins 5 hours from end of shift 
         #and ends 4.5 hours after start of shift. 18+ has window 1 hour from start and end
@@ -139,6 +140,11 @@ class Employee:
         self.__untrained_positions = value
     def get_untrained_positions(self):
         return self.__untrained_positions
+    def get_lead(self):
+        return self.__is_lead
+    def train_on_position(self, position):
+        while position.lower() in self.__untrained_positions:
+            self.__untrained_positions.remove(position.lower())
     
 
 class Ride:

@@ -2,7 +2,7 @@ import red_tag_classes
 import red_tag_CLI
 import red_tag_test_utils
 import csv
-
+import copy
 import ast
 """
 This is red_tag. It will simulate the job of a red tag by creating a rotation at a specified ride
@@ -161,12 +161,16 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
     while csv_option.lower() != 'y' and csv_option.lower() != 'n':
         csv_option = input('\033[33mWould you like to input employee data from a csv file? Please enter y or n\033[0m')
     
-    # Identify positions clerks can't do
+    # Identify positions clerks and leads can't do
     no_clerks = []
+    no_leads = []
     positions = {**ride.get_pos_dict(), **ride.get_optional_pos_dict()}
     for p in positions:
         if not positions[p][2]:
             no_clerks.append(p.lower())
+        if not positions[p][1]:
+            no_leads.append(p.lower())
+
     #If they are reading from CSV, get the name of the file
     if csv_option.lower() == 'y':
         file_name = input('Please enter the name of the CSV file you would like to read data from')
@@ -179,17 +183,22 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
                         #Split the shift start and end times into tokens 
                         e_start = line[2].split(':')
                         e_end = line[3].split(':')
+                        is_lead = int(line[4]) == 1
                         #Create a new employee object using the data in the line. Create a new Time object for shift start/end 
-                        current = red_tag_classes.Employee(line[0],line[1], red_tag_classes.Time(int(e_start[0]),int(e_start[1])), red_tag_classes.Time(int(e_end[0]), int(e_end[1])))
+                        current = red_tag_classes.Employee(line[0],line[1], red_tag_classes.Time(int(e_start[0]),int(e_start[1])), red_tag_classes.Time(int(e_end[0]), int(e_end[1])), is_lead )
 
                         #Reassemble the untrained positions
-                        line[4] = line[4:]
+                        line[5] = line[5:]
 
                         # Add non-clerk positions if needed 
                         if int(line[1]) < 16:
-                            line[4] += no_clerks
+                            line[5] += no_clerks
                         
-                        current.set_untrained_positions(line[4]) # Add the untrained positions
+                        # Add non-lead positions if needed
+                        if current.get_lead():
+                            line[5] += no_leads
+                        
+                        current.set_untrained_positions(line[5]) # Add the untrained positions
                         employee_list.append(current)
                         #If we have more employees than positions, break out
                         if len(employee_list) > len(ride.get_pos_dict()) + len(ride.get_optional_pos_dict()):
@@ -227,6 +236,18 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
             except ValueError:
                 print('\033[31mPlease enter a value\033[0m')
 
+        # Determine if they are a lead
+        is_lead = ''
+        while is_lead == '':
+            is_lead = input(f'Is {name} a lead? Enter Y or N:')
+            if is_lead.lower() == 'y':
+                is_lead = True
+            elif is_lead.lower() == 'n':
+                is_lead = False
+            else:
+                is_lead = ''
+        
+
         # Add any positions they should avoid
         avoid_list = []
 
@@ -246,7 +267,7 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
             shift_start_q = input('Are they working the entire day? Please enter Y or N.')
         if shift_start_q == 'Y' or shift_start_q == 'y':
             #Creates an employee object with shift time half hour before open to half hour past close
-            current = red_tag_classes.Employee(name, age, p_start.subtract(red_tag_classes.Time(0,30)), p_end.add(red_tag_classes.Time(0,30)))
+            current = red_tag_classes.Employee(name, age, p_start.subtract(red_tag_classes.Time(0,30)), p_end.add(red_tag_classes.Time(0,30)), is_lead)
         else:
 
             #Idiot check loop to ensure they enter a valid time format for start
@@ -262,7 +283,7 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
                 e_end = input('What time does this employee end their shift?')
             e_end = e_end.split(':')
             e_end = red_tag_classes.Time(int(e_end[0]), int(e_end[1])) #Put the impout into a time object
-            current = red_tag_classes.Employee(name, age, e_start, e_end) #Create an employee object with all the info we just collected
+            current = red_tag_classes.Employee(name, age, e_start, e_end, is_lead) #Create an employee object with all the info we just collected
         
         current.set_untrained_positions(avoid_list) # Set the untrained positions
         employee_list.append(current) #Add the new employee to the list
@@ -272,11 +293,6 @@ def gather_employee_data(number_positions, p_start, p_end, ride):
     calculate_position_availability(employee_list, ride)
 
         
-
-    #Find the lead and make sure they are marked as not needing a break. 
-    # TODO: Create lead break logic - if 2 leads are present they can break themselves, but gotta make sure at least 1 is present at all times
-    lead = find_employee_in_list(employee_list, 'Lead')
-    lead.set_break_status(True)
     return employee_list
 
 
@@ -341,18 +357,14 @@ def training_check (position_availability, print_errors):
     
     return True
 
-# TODO: The logic between this and next rortation is now almost identical
-# Should we rename this function and add a parameter for when it is first rotation
-# If it is first rotation, we would be looking for people with unset position
-# For next rortation, we are looking that position does not equal current
 
-def begin_rotation(employee_list, ride, position_availability):
+def rotate(employee_list, ride, position_availability, first):
     #Grab some variables we will need throughout the function
     pos_dict = ride.get_pos_dict()
     optional_pos_dict = ride.get_optional_pos_dict()
     all_positions_list = list(pos_dict.keys()) + list (optional_pos_dict.keys())
 
-    temp_position_availability = position_availability.copy()
+    temp_position_availability = copy.deepcopy(position_availability)
 
     for _ in range(len(all_positions_list)): # This is how many positions we have to assign, no matter what
         for tightness in range(1, len(all_positions_list) +1):
@@ -363,13 +375,12 @@ def begin_rotation(employee_list, ride, position_availability):
                     current_position = position.lower()
                     break
             if current_position != None:
-                print (f' Current position has been chosen as {current_position}')
                 break
         # Having found the position, lets deal with it
         for candidate in employee_list:
-            if candidate.get_pos()  == None and candidate.get_name() in temp_position_availability[position.lower()]:
+            if ((candidate.get_pos()  == None and first) or (candidate.get_pos() != current_position and not first )) and candidate.get_name() in temp_position_availability[current_position.lower()]:
                 # Set them
-                change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, position)
+                change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, current_position)
 
                 # Remove this employee from everywhere else in the temp availability - they are no longer available
                 for position , people in temp_position_availability.items():
@@ -379,6 +390,7 @@ def begin_rotation(employee_list, ride, position_availability):
                 # Remove the position from all_positions_list - it cannot be set twice
                 all_positions_list.remove(current_position)
                 break # Move on 
+
 
 def do_breaks(optional_pos_dict, break_occuring, break_list, employee_list, pos_dict):
     optional_positions_list = list(optional_pos_dict)
@@ -471,43 +483,11 @@ def next_rotation(employee_list, ride, break_list, p_start, p_end, position_avai
             break
 
     #If it is possible, send the person on break and remove the from the break list
-    #TODO: Debug this code
-    #Parameterise it so when the "IGGNORE" parameter is passed, it ignores that person and finds the next person
     if break_occuring >0:
        do_breaks(optional_pos_dict, break_occuring, break_list, employee_list, pos_dict)
 
-    # #Third priority is rotating all remaing employees
-    # #TODO: Add training logic here
-    # first_pos = employee_list[0]
-    # for i in range(len(employee_list)):
-    #     current_pos = employee_list[i].get_pos()
-    #     if current_pos == "Break": #Don't rotate people on break
-    #         continue
-    #     try:
-    #         next_employee = employee_list[i+1] #Try to move them one down the list
-    #     except:
-    #         next_employee = first_pos #Unless you are at the end of the list, in that case, go back to the start
-    #     if next_employee.get_pos() == "Break":
-    #         continue
 
-    #     change_position(employee_list, pos_dict, optional_pos_dict, employee_list[i].get_name(), next_employee.get_name(), None) #Perform the swap
-    all_positions_list = list(pos_dict.keys()) + list (optional_pos_dict.keys())
-
-    for tightness in range(1,len(all_positions_list)+1):
-        for position in all_positions_list: # We can do all positions now b/c we know we have enough to cover mandatory and optional
-            if len(position_availability[position.lower()]) == tightness: # It is currently time to work on this position
-                    for candidate in employee_list:
-                        if tightness == 1:
-                            # They cant rotate because they are the only ones trained there
-                            continue
-                        try:
-                            if candidate.get_pos().lower() != position.lower() and candidate.get_name() in position_availability[position.lower()]:
-                                # Time to set them here
-                                change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, position) #TODO: Inspect this line if it causes multiple peole at the same position
-                                break
-                        except:
-                            print (candidate.get_name(), candidate.get_pos())
-                            continue
+    rotate(employee_list, ride, position_availability, False)
 
 
     clean_rotation(employee_list, ride) #Make sure clerks aren't operating, leads aren't clerking, etc.
