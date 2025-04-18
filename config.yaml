@@ -1,0 +1,120 @@
+rotation_length: 45
+park_open: "10:00"
+park_close: "20:00"
+
+ride:
+  name: 'Electic Fan'
+  mins: 7
+  positions:
+  - name: "load"
+    clerk: false
+    lead: true
+    mandatory: true
+  - name: "unload"
+    clerk: false
+    lead: true
+    mandatory: true
+  - name: "dispatch"
+    clerk: false
+    lead: true
+    mandatory: true
+  - name: "operate"
+    clerk: false
+    lead: true
+    mandatory: true
+  - name: "frontline"
+    clerk: true
+    lead: false
+    mandatory: true
+  - name: "merger"
+    clerk: true
+    lead: false
+    mandatory: true
+  - name: "grouper"
+    clerk: false
+    lead: true
+    mandatory: true
+
+employees:
+  - name: "lead"
+    is_lead: True
+    age: 18
+    shift_start: '9:30'
+    shift_end: '20:30'
+    untrained_positions:
+      - operate
+      - fronline
+      - merger
+      - dispatch
+      - grouper
+  - name: 'adult1'
+    is_lead: False
+    age: 18
+    shift_start: '9:30'
+    shift_end: '20:30'
+    untrained_positions:
+      - load
+      - dispatch
+      - frontline
+      - merger
+      - grouper
+  - name: 'adult2'
+    is_lead: False
+    age: 18
+    shift_start: '9:30'
+    shift_end: '20:30'
+    untrained_positions:
+      - unload
+      - merger
+      - frontline
+      - dispatch
+      - grouper
+  - name: 'adult3'
+    is_lead: False
+    age: 18
+    shift_start: '9:30'
+    shift_end: '20:30'
+    untrained_positions:
+      - load
+      - unload
+      - operate
+      - merger
+      - dispatch
+  - name: 'minor1'
+    is_lead: False
+    age: 17
+    shift_start: '10:00'
+    shift_end: '18:00'
+    untrained_positions:
+      - load
+      - unload
+      - operate
+      - frontline
+      - grouper
+  - name: 'minor2'
+    is_lead: False
+    age: 17
+    shift_start: '10:00'
+    shift_end: '18:00'
+    untrained_positions:
+      - load
+      - unload
+      - operate
+      - frontline
+      - merger
+  - name: 'clerk'
+    is_lead: False
+    age: 15
+    shift_start: '10:00'
+    shift_end: '18:00'
+    untrained_positions: 
+      - load
+      - unload
+      - operate
+      - dispatch
+      - grouper
+
+    
+
+
+

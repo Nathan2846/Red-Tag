@@ -95,7 +95,7 @@ class Employee:
             
     def __repr__(self):
         result = "Here is the information for " + self.__name + "\n"
-        result += "Age: " + self.__age + "\nShift time: " + str(self.__shift_start) + "-"  + str(self.__shift_end) +"\n"
+        result += "Age: " + str(self.__age) + "\nShift time: " + str(self.__shift_start) + "-"  + str(self.__shift_end) +"\n"
         if self.__break_status :
             print('end' , self.__break_end)
             result += "Break ended at: " + str(self.__break_end) + '\n'
@@ -159,46 +159,40 @@ class Ride:
         self.__pos_dict = {}
         self.__optional_pos_dict = {}
         self.__current_time = None
-    def add_pos(self):
-        name = input ('Please enter the name of the position')
-        clerk_status = ''
-        while clerk_status.lower() != 'y' and clerk_status.lower() != 'n':
-            clerk_status = input('Can a clerk occupy this position? Please enter Y or N')
-        if clerk_status == 'y' or clerk_status == 'Y':
-            clerk_status = True
-        else:
-            clerk_status = False
 
-        lead_status = ''
-        while lead_status.lower() != 'y' and lead_status.lower() != 'n':
-            lead_status = input('Can a lead occupy this position? Please enter Y or N')
-        if lead_status == 'y' or lead_status == 'Y':
-            lead_status = True
+    def add_pos(self, name=None, lead_status=None, clerk_status=None, mandatory=True):
+        if name == None or lead_status ==None or clerk_status == None:
+            # One or more pieces of info are missing
+            name = input ('Please enter the name of the position')
+            clerk_status = ''
+            while clerk_status.lower() != 'y' and clerk_status.lower() != 'n':
+                clerk_status = input('Can a clerk occupy this position? Please enter Y or N')
+            if clerk_status == 'y' or clerk_status == 'Y':
+                clerk_status = True
+            else:
+                clerk_status = False
+            
+            lead_status = ''
+            while lead_status.lower() != 'n' and lead_status.lower() != 'y':
+                lead_status = input('Can a lead occupy this position? Please enter Y or N')
+            if lead_status == 'y' or clerk_status == 'Y':
+                lead_status = True
+            else:
+                lead_status = False
+            
+            mandatory = None
+            while mandatory == None:
+                mandatory = (input('Is this position mandatory? Enter Y or N:')).lower()
+                if mandatory == 'y':
+                    mandatory = True
+                elif mandatory == 'n':
+                    mandatory = False
+        # All data has now either been collected or was part of the function call
+        if mandatory:
+            self.__pos_dict[name] = [None, lead_status, clerk_status]
         else:
-            lead_status = False
-        self.__pos_dict[name] = [None, lead_status, clerk_status]
-    def add_pos_csv(self, name, lead_status, clerk_status ):
-        self.__optional_pos_dict[name] = [None, lead_status, clerk_status]
-    def add_optional_pos(self):
-        name = input ('Please enter the name of the position')
-        clerk_status = ''
-        while clerk_status.lower() != 'y' and clerk_status.lower() != 'n':
-            clerk_status = input('Can a clerk occupy this position? Please enter Y or N')
-        if clerk_status == 'y' or clerk_status == 'Y':
-            clerk_status = True
-        else:
-            clerk_status = False
-        
-        lead_status = ''
-        while lead_status.lower() != 'n' and lead_status.lower() != 'y':
-            lead_status = input('Can a lead occupy this position? Please enter Y or N')
-        if lead_status == 'y' or clerk_status == 'Y':
-            lead_status = True
-        else:
-            lead_status = False
-        self.__optional_pos_dict[name] = [None, lead_status, clerk_status]
+            self.__optional_pos_dict[name] == [None, lead_status, clerk_status]
 
-        return name
 
     def remove_pos(self,name):
         if name in self.__pos_dict:
