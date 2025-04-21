@@ -12,70 +12,36 @@ ROTATION_LENGTH = 45
 
 
 
-def calculate_position_availability(employee_list, ride):
-    #Begin by getting all positions in one list
-    all_positions = list(ride.get_pos_dict().keys()) + list(ride.get_optional_pos_dict().keys())
-
-    position_availability = {}
-    # Determine List of employees for each positions. Create a dictionary where the key is the position
-    # and the value is the list of employees that can do it
-
-    for position in all_positions:
-        position_availability[position.lower()] = []
-        for employee in employee_list:
-            if position.lower() not in employee.get_untrained_positions():
-                position_availability[position.lower()].append(employee.get_name())
-
-    
-    return position_availability
 
 
 
-"""
-This function returns a list of all the breaks that need completed in order
-"""
-def make_break_list(employee_list, number_positions):
-    duplicate = employee_list.copy() #Create a duplicate of the employee list to work with
-    return_list = []
-    for _ in range(len(employee_list)):
-        max_time = red_tag_classes.Time(24,00) #A maximum time value
-        current_lowest_employee = 1 #This variable will hold the employee object with the first brak time
-        lowest_index = 0 #This will be the index of the lowest employee
-        for i in range(len(duplicate)):
-            potential_employee = duplicate[i] #The current employee
-            current_break_start = potential_employee.get_break_window()[0]
-            if current_break_start < max_time and current_break_start != red_tag_classes.Time(0,0):
-                #They need a break, and it is earlier than any other found thus far. Set all variables
-                max_time = current_break_start
-                current_lowest_employee = potential_employee
-                lowest_index = i
-        if current_lowest_employee.get_name().lower() == 'lead':
-            duplicate.pop(lowest_index) #Remove the lead, we don't need to deal with them
-            continue #Continue on without adding them to the return_list
-        return_list.append(current_lowest_employee) #Add the employee onto the end of the list
-        if (len(duplicate))!= 0 :
-            #Remove the employee from the duplicate
-            duplicate.pop(lowest_index)
-
-    return return_list
-
-def training_check (position_availability, print_errors):
-    # Determine if there are any issues with training
-    for position, people in position_availability.items():
-        if len(people) == 0:
-            # Fail
-            if print_errors:
-                print (f'There are no people trained at {position} - exiting')
+def training_check (position_availability, person = None):
+    # If we aren't looking at a specific person, just check the whole thing
+    if person == None:
+        for position in position_availability:
+            if len(position_availability[position]) == 0:
                 return False
-        if len (people) == 1:
-            if print_errors:
-                print (f'There is only one person trained at {position}')
+        return True
     
-    return True
+    # Otherwise, let's check what will happen if we get rid of "person"
+    result = {1: [], 2: [], 'other': []}
+    for position in position_availability:
+        availability = position_availability[position]
 
+        if person in availability:
+            if len(availability) == 1:
+                result[1].append(position)
+            elif len(availability) == 2:
+                result[2].append(position)
+            else:
+                result['other'].append(position)
+    return result
+    
 
-def rotate(employee_list, ride, position_availability, first):
+def rotate(ride, first):
     #Grab some variables we will need throughout the function
+    employee_list = ride.get_employee_list()
+    position_availability = ride.get_position_availability()
     pos_dict = ride.get_pos_dict()
     optional_pos_dict = ride.get_optional_pos_dict()
     all_positions_list = list(pos_dict.keys()) + list (optional_pos_dict.keys())
@@ -96,7 +62,7 @@ def rotate(employee_list, ride, position_availability, first):
         for candidate in employee_list:
             if ((candidate.get_pos()  == None and first) or (candidate.get_pos() != current_position and not first )) and candidate.get_name() in temp_position_availability[current_position.lower()]:
                 # Set them
-                change_position(employee_list, pos_dict, optional_pos_dict, candidate.get_name(), None, current_position)
+                change_position(ride,candidate.get_name(), None, current_position)
 
                 # Remove this employee from everywhere else in the temp availability - they are no longer available
                 for position , people in temp_position_availability.items():
@@ -108,9 +74,21 @@ def rotate(employee_list, ride, position_availability, first):
                 break # Move on 
 
 
-def do_breaks(optional_pos_dict, break_occuring, break_list, employee_list, pos_dict, ride):
+def do_breaks(break_occuring, ride):
+    # Grab/compute all the variables
+    pos_dict = ride.get_pos_dict()
+    optional_pos_dict = ride.get_optional_pos_dict()
+    break_list = ride.get_break_list()
+    employee_list = ride.get_employee_list()
+
     optional_positions_list = list(optional_pos_dict)
-    for i in range(break_occuring):
+    for i in range(break_occuring): 
+
+        # Grab/compute all the variables
+        pos_dict = ride.get_pos_dict()
+        optional_pos_dict = ride.get_optional_pos_dict()
+        break_list = ride.get_break_list()
+
         #Lets determine who gets to go on break
         index = 0
         time = break_list[index].get_break_window()[0]
@@ -127,17 +105,35 @@ def do_breaks(optional_pos_dict, break_occuring, break_list, employee_list, pos_
         position_to_fill = break_list[index].get_pos() #The position of the person who is aboyut to go on break that will need filled
         position_to_vacate = optional_positions_list[i] #The position that will be pulled to cover break
         person_to_break = break_list[index] #An employee object
-        person_to_fill = optional_pos_dict[position_to_vacate][0] #A name 
+        person_to_fill = optional_pos_dict[position_to_vacate][0] #A name - don't matter if they are trained, they are about to rotate
 
         change_position(employee_list, pos_dict, optional_pos_dict, person_to_break.get_name(), None, "Break") #Send the person to break
         change_position(employee_list, pos_dict, optional_pos_dict, person_to_fill, None, position_to_fill ) #Have the person filling fill the spot
 
+        # Make local changes
+        break_list.pop(index) #Get them off the break list
         optional_pos_dict[position_to_vacate][0] = None #Empty the old position
         person_to_break.set_break_status(True) #Update the person's status
-        break_list.pop(index) #Get them off the break list
+
+        # Save them to ride object
+        ride.set_optional_pos_dict(optional_pos_dict)
+        ride.set_break_list(break_list)
+        ride.set_pos_dict(pos_dict)
+
+
         print('\033[33m',person_to_break.get_name() + " is going on break now\033[0m") #Notify the user
 
-def next_rotation(employee_list, ride, break_list, p_start, p_end, position_availability):
+        # Return that which you changed
+        return pos_dict, optional_pos_dict, break_list
+
+def next_rotation(ride, p_start, p_end):
+    # Get variables
+    employee_list = ride.get_employee_list()
+    break_list - ride.get_break_list()
+    position_availability = ride.get_position_availability()
+    optional_pos_dict = ride.get_optional_pos_dict()
+    pos_dict = ride.get_pos_dict()
+
     #Increase time for next rotation
     ride.set_current_time(ride.get_current_time().add(red_tag_classes.Time(0,ROTATION_LENGTH)))
 
@@ -146,10 +142,6 @@ def next_rotation(employee_list, ride, break_list, p_start, p_end, position_avai
         return False
     
 
-
-    #Making life easier
-    optional_pos_dict = ride.get_optional_pos_dict()
-    pos_dict = ride.get_pos_dict()
 
     #If anyone is on break, take them off break and assign them a random position in optional.
     #They may possibly be pulled before the rotation is printed to accomodate the next break
@@ -168,13 +160,13 @@ def next_rotation(employee_list, ride, break_list, p_start, p_end, position_avai
 
     #First priority is to send people home if needed
     #TODO: Add training check logic to this function
-    send_people_home_result = send_people_home(employee_list, ride, break_list, p_start, p_end)
+    send_people_home_result = send_people_home(employee_list, ride, break_list, p_start, p_end, position_availability)
     if send_people_home_result[0]:
         break_list = send_people_home_result[1] #Update the break list if needed from the send_people_home function
     
     #Perform feasibility check - determines if there are any violations
     #TODO: Add logic to feasibility check to make sure you aren't sending home/on break the one person who is trained at a position
-    feasibility_result = feasibility_check(employee_list, break_list, pos_dict, optional_pos_dict, ride, p_start, p_end)
+    feasibility_result = feasibility_check(employee_list, break_list, pos_dict, optional_pos_dict, ride, p_start, p_end) # Does not change anything, no need to get/set thinga within the function
     if not feasibility_result[0]:
         #There will be some violations at some point
         print ('\033[31m' , 'WARNING:', '\033[0m', 'violation expected at', feasibility_result[3])
@@ -200,22 +192,61 @@ def next_rotation(employee_list, ride, break_list, p_start, p_end, position_avai
 
     #If it is possible, send the person on break and remove the from the break list
     if break_occuring >0:
-       do_breaks(optional_pos_dict, break_occuring, break_list, employee_list, pos_dict, ride)
+       pos_dict, optional_pos_dict, break_list = do_breaks(break_occuring, ride)
 
 
-    rotate(employee_list, ride, position_availability, False)
+    rotate(ride, False)
 
     return send_people_home_result #Return this so the CLI knows if the breaks_list has changed and some employees have gone home
 
+# In progress
+def new_send_people_home (employee_list, ride, break_list, p_start, p_end, position_availability):
+    pos_dict = ride.get_pos_dict()
+    opt_pos_dict = ride.get_optional_pos_dict()
+    current_time = ride.get_current_time()
 
+        #Let us now determine if any employees shift are going to end on this rotation
+    people_leaving = []
+    for employee in employee_list:
+        if employee.get_shift_end() < current_time or employee.get_shift_end() == current_time:
+            people_leaving.append(employee)
 
+    # If there's no one leaving, we are done here
+    if (len(people_leaving) == 0):
+        return [False]
+    
+    for i, employee in enumerate(people_leaving):
+        # Get the training report
+        training = training_check(position_availability, employee.get_name())
+
+        # Review training violations of sending this employee home
+        while len(training[0]) != 0 :
+            position = training[0]
+            # At least one critical training violation will occur because of this
+            # Determine if the position is critical
+            if position in opt_pos_dict:
+                training[0].pop(0) # Don't care - clear them out 
+            else:
+                #This is a problem - employee MUST be replaced
+                training[0] = swap(position_availability, ride, employee, training[0])
+
+#In progress
+def swap(position_availability, ride, employee, violations):
+    print (f'It is time for {employee.get_name()} to go home for the day, but if they leave there will be no one left who is trained at the following positions:')
+    for p in violations:
+        print ('\t\t',p)
+    
+    print ('Because these positions are not optional, you will need to add someone (or multiple people) to the ride who is/are trained at this time')
+
+    # Continue adding people 
+    
 
 """
 This function will determine if people will need to go home in the next ROTATION_LENGTH minutes. If they do, it will prompt
 the user to either remove the position (if possible), add a new employee, or continue with this employee in, while ackowledging
 that this may result in a violation
 """
-def send_people_home(employee_list, ride, break_list, p_start, p_end):
+def send_people_home(employee_list, ride, break_list, p_start, p_end, position_availability):
     #Let us make life easier
     pos_dict = ride.get_pos_dict()
     optional_pos_dict = ride.get_optional_pos_dict()
@@ -236,6 +267,8 @@ def send_people_home(employee_list, ride, break_list, p_start, p_end):
             employee_leaving = people_leaving[i]
             print("\n")
             print ('\033[33m',employee_leaving.get_name() , " needs to leave at " , employee_leaving.get_shift_end() , '\033[0m')
+
+            # Inform them about violation time or its lack of relevance
             if (int(employee_leaving.get_age()) < 18):
                 #Determine the violation time
 
@@ -252,124 +285,141 @@ def send_people_home(employee_list, ride, break_list, p_start, p_end):
             else:  
                 print ("\033[32mThis employee is not a minor, you do not need to worry about violations for this employee\033[0m")  
 
+            # Get information about training
+            training_check_result = training_check(position_availability, True, employee_leaving.get_name())
+
+            # TODO: Rewrite the logic for this entire function. See blue sheet (hah!)
+
+
 
             #Present the user with the options for what they can do about this problem
-            while True:
-                #Idiot check to make sure the command given is one of the permitted options
-                command = ''
-                while command != '+' and command != '-' and command != 'acknowledge':
-                    command = input("Please identify how you would like to address this issue. Press '-' to remove an optional position, if possible \n Press '+' to add an employee to replace "+
-                    employee_leaving.get_name()+ ". \n Type 'acknowledge' to continue with this employee for the next rotation. By doing so, you acknowledge that this could lead to a violation")
 
-                if command == 'acknowledge':
-                    #Break out and do nothing for this employee
-                    print ('\033[31mRisk acknowledged. The rotation will now continue with this employee in it\033[0m')
-                    break
-                elif command == '+':
-                    #Create a new Employee object. Recalculate break list with existing break list and new employee object.
-                    current = add_an_employee(employee_list, p_start, p_end) #Call the helper to return a new employee
+            #Idiot check to make sure the command given is one of the permitted options
+            command = ''
 
-                    #Determine if the employee needs a break, and if so, add them to the break list
-                    #Idiot check for this input
-                    needs_break = ''
-                    while needs_break.lower() != 'n' and needs_break.lower() != 'y': 
-                        needs_break = input ('Does ' + current.get_name() + ' need a break? Please enter y or n' )
-                    if needs_break == 'n':
-                        current.set_break_status(True)
-                    else:
-                        #Remake the break list with the new employee in it
-                        break_list.append(current)
-                        break_list = make_break_list(break_list, len(break_list))
+            # Depending on the result of the training check and the nature of the position, the next action may be predetermined
+            if training_check_result == 1:
+                print (f' Fatal error - you have no employees trained at this position')
+                exit(0)
+            elif training_check_result == 2: #This should never happen, because it would mean there is no one trained at the position at all
+                print (f' You are about to lose your only employee trained at this position')
+                if employee_leaving.get_pos().lower() in pos_dict.keys():
+                    print (f'This is a mandatory position - you cannot get rid of it. Your must add an employee to replace them with or ackowledge that you are keeping this employee beyond their scheduled end-of-shift ')
+
+
+            while command != '+' and command != '-' and command != 'acknowledge':
+                command = input("Please identify how you would like to address this issue. Press '-' to remove an optional position, if possible \n Press '+' to add an employee to replace "+
+                employee_leaving.get_name()+ ". \n Type 'acknowledge' to continue with this employee for the next rotation. By doing so, you acknowledge that this could lead to a violation")
+
+            if command == 'acknowledge':
+                #Break out and do nothing for this employee
+                print ('\033[31mRisk acknowledged. The rotation will now continue with this employee in it\033[0m')
+                break
+            elif command == '+':
+                #Create a new Employee object. Recalculate break list with existing break list and new employee object.
+                current = add_an_employee(employee_list, p_start, p_end) #Call the helper to return a new employee
+
+                #Determine if the employee needs a break, and if so, add them to the break list
+                #Idiot check for this input
+                needs_break = ''
+                while needs_break.lower() != 'n' and needs_break.lower() != 'y': 
+                    needs_break = input ('Does ' + current.get_name() + ' need a break? Please enter y or n' )
+                if needs_break == 'n':
+                    current.set_break_status(True)
+                else:
+                    #Remake the break list with the new employee in it
+                    break_list.append(current)
+                    break_list = make_break_list(break_list, len(break_list))
+                
+                #Perform the swap
+                leaving_position = employee_leaving.get_pos()
+                #Call the obliterate function with the correct dictionary
+                pos_dict, optional_pos_dict, break_list, employee_list = obliterate_employee(ride, employee_leaving.get_name())
+                
+                current.set_pos(leaving_position) #Set the new employees position to the position the employee is leaving
+
+                #Set the dictionary entry to the new employees name
+                try:
+                    pos_dict[leaving_position][0] = current.get_name()
+                except KeyError:
+                    optional_pos_dict[leaving_position][0]= current.get_name()
+                
+                #Set the return value to the new break list
+                send_people_home_return = [True, break_list]
+
+                break
+                
+
+            elif command == '-':
+                #Choose to subtract a position. Let us determine if there is a position to subtract.
+                #If 0, tell them to choose another option, if 1 remove it, if 2 or more give them a choice
+                if (len(optional_pos_dict) == 0):
+                    print("\033[31m You are already at mins and cannot remove a position. Please choose another option \033[0m")
+                elif (len(optional_pos_dict) == 1):
                     
-                    #Perform the swap
+                    #Get the info needed
                     leaving_position = employee_leaving.get_pos()
-                    #Call the obliterate function with the correct dictionary
-                    try:
-                        obliterate_employee(employee_list, break_list, pos_dict, employee_leaving.get_name())
-                    except KeyError:
-                         obliterate_employee(employee_list, break_list, optional_pos_dict, employee_leaving.get_name())
+                    dict_keys = list(optional_pos_dict.keys())
+                    position = dict_keys[0] #The only optional position - about to be removed
+                    employee_name_covering = optional_pos_dict[position][0] #The name of the employee in that position
+                    print ("There is only one optional position currently: ", position, " and it will now be deleted. \033[31m You are at mins \033[0m")
                     
-                    current.set_pos(leaving_position) #Set the new employees position to the position the employee is leaving
-
-                    #Set the dictionary entry to the new employees name
+                    #remove the employee that is leaving
+                    print ('\033[32m',employee_leaving.get_name(), " may now leave. Thank you for being here today! \033[0m")
                     try:
-                        pos_dict[leaving_position][0] = current.get_name()
-                    except KeyError:
-                        optional_pos_dict[leaving_position][0]= current.get_name()
-                   
-                   #Set the return value to the new break list
-                    send_people_home_return = [True, break_list]
+                        obliterate_employee(employee_list, break_list,pos_dict,employee_leaving.get_name()) #Obliterate the employee
 
+                        
+                        #Set the position of the employee covering to the position of the person leaving
+                        employee_covering = find_employee_in_list(employee_list, employee_name_covering) #The employee object in the optional position
+                        employee_covering.set_pos(leaving_position) #Set position in employee object
+                        pos_dict[leaving_position][0] = employee_name_covering #Set position in dictionary
+                    
+                    except KeyError:
+                        #The employee we are removing is occupying the position we are removing. 
+
+                        #Obliterate the employee from the optional pos dict
+                        obliterate_employee(employee_list, break_list, optional_pos_dict, employee_leaving.get_name())
+
+                        #We don't need to do anything further as no one needs to cover the optional position
+
+                    #remove the position they are vacating
+                    del optional_pos_dict[position] #Remove the optional position
                     break
-                    
+                else:
+                    #Give the employee the option of who they would like to remove
+                    print ("\033[33mThere are multiple positions that can be removed. Please select the option you would like removed by entering the number in brackets after it is listed\033[0m")
+                    i = 0
+                    optional_position_list = []
+                    for optional_position in optional_pos_dict: #Print out their options
+                        print (optional_position, '[', i, ']', end=" --- ")
+                        i += 1
+                        optional_position_list.append(optional_position) #Add it to the list so we can pick it using the index the user provides
+                    choice = int(input("Please enter your choice now:"))
 
-                elif command == '-':
-                    #Choose to subtract a position. Let us determine if there is a position to subtract.
-                    #If 0, tell them to choose another option, if 1 remove it, if 2 or more give them a choice
-                    if (len(optional_pos_dict) == 0):
-                        print("\033[31m You are already at mins and cannot remove a position. Please choose another option \033[0m")
-                    elif (len(optional_pos_dict) == 1):
-                        
-                        #Get the info needed
-                        leaving_position = employee_leaving.get_pos()
-                        dict_keys = list(optional_pos_dict.keys())
-                        position = dict_keys[0] #The only optional position - about to be removed
-                        employee_name_covering = optional_pos_dict[position][0] #The name of the employee in that position
-                        print ("There is only one optional position currently: ", position, " and it will now be deleted. \033[31m You are at mins \033[0m")
-                        
-                        #remove the employee that is leaving
-                        print ('\033[32m',employee_leaving.get_name(), " may now leave. Thank you for being here today! \033[0m")
-                        try:
-                            obliterate_employee(employee_list, break_list,pos_dict,employee_leaving.get_name()) #Obliterate the employee
+                    #This now almost the same as above
+                    leaving_position = employee_leaving.get_pos() #The position of the employee leaving
+                    position = optional_position_list[choice] #The positoion we are going to remove
+                    employee_name_covering = optional_pos_dict[position][0] #The name of the person in the position we are about to delete
 
-                            
-                            #Set the position of the employee covering to the position of the person leaving
-                            employee_covering = find_employee_in_list(employee_list, employee_name_covering) #The employee object in the optional position
-                            employee_covering.set_pos(leaving_position) #Set position in employee object
-                            pos_dict[leaving_position][0] = employee_name_covering #Set position in dictionary
-                        
-                        except KeyError:
-                            #The employee we are removing is occupying the position we are removing. 
+                    try:
+                        obliterate_employee(employee_list, break_list, pos_dict, employee_leaving.get_name()) 
 
-                            #Obliterate the employee from the optional pos dict
-                            obliterate_employee(employee_list, break_list, optional_pos_dict, employee_leaving.get_name())
-
-                            #We don't need to do anything further as no one needs to cover the optional position
-
-                        #remove the position they are vacating
-                        del optional_pos_dict[position] #Remove the optional position
-                        break
-                    else:
-                        #Give the employee the option of who they would like to remove
-                        print ("\033[33mThere are multiple positions that can be removed. Please select the option you would like removed by entering the number in brackets after it is listed\033[0m")
-                        i = 0
-                        optional_position_list = []
-                        for optional_position in optional_pos_dict: #Print out their options
-                            print (optional_position, '[', i, ']', end=" --- ")
-                            i += 1
-                            optional_position_list.append(optional_position) #Add it to the list so we can pick it using the index the user provides
-                        choice = int(input("Please enter your choice now:"))
-
-                        #This now almost the same as above
-                        leaving_position = employee_leaving.get_pos() #The position of the employee leaving
-                        position = optional_position_list[choice] #The positoion we are going to remove
-                        employee_name_covering = optional_pos_dict[position][0] #The name of the person in the position we are about to delete
-
-                        try:
-                            obliterate_employee(employee_list, break_list, pos_dict, employee_leaving.get_name()) 
-
-                            employee_covering = find_employee_in_list(employee_list, employee_name_covering) #The object for the name of employee_name_covering
-                            employee_covering.set_pos(leaving_position) #Set their position
-                            pos_dict[leaving_position][0] = employee_name_covering #Adjust the dictionary
-                        except KeyError:
-                            #The position is optional and can just be deleted without swapping people
-                            obliterate_employee(employee_list, break_list, optional_pos_dict, employee_leaving.get_name())
-                        del optional_pos_dict[position] #Remove the old position from the dictionary
-                        break
-        return send_people_home_return #Return the result as false as we did not need to adjust the breaks list at all
+                        employee_covering = find_employee_in_list(employee_list, employee_name_covering) #The object for the name of employee_name_covering
+                        employee_covering.set_pos(leaving_position) #Set their position
+                        pos_dict[leaving_position][0] = employee_name_covering #Adjust the dictionary
+                    except KeyError:
+                        #The position is optional and can just be deleted without swapping people
+                        obliterate_employee(employee_list, break_list, optional_pos_dict, employee_leaving.get_name())
+                    del optional_pos_dict[position] #Remove the old position from the dictionary
+                    break
+    return send_people_home_return #Return the result as false as we did not need to adjust the breaks list at all
 
 
-def add_an_employee(employee_list, p_start, p_end, ):
+def add_an_employee(ride, p_start, p_end):
+    # Get variables
+    employee_list = ride.get_employee_list()
+    break_list = ride.get_break_list()
     #Create a new Employee object. This function does NOT add them to the break list or recalculate it if necessary
 
     #Idiot loop to make sutre the name has no spaces
@@ -385,6 +435,20 @@ def add_an_employee(employee_list, p_start, p_end, ):
             break
         except ValueError:
             print('\033[31m Please enter a value \033[0m')
+
+    # Determine if they already had a break
+    break_answer = ''
+    if break_answer.lower() != 'y' and break_answer.lower() != 'n':
+        break_answer = input("Has " + name + " had a break yet? Please enter y or n: ")
+    if break_answer.lower() == 'y':
+        time_answer = ''
+        while (len(time_answer.split()))!= 2:
+            time_answer = input("What time did the break end? Enter in the form HH:MM")
+        time_tokens = time_answer.split(':') 
+        break_status = True
+        break_end = (red_tag_classes.Time(time_tokens[0], time_tokens[1]))
+    else:
+        break_status = False
     shift_start_q = ''
     while shift_start_q.lower() != 'y' and shift_start_q.lower() != 'n':
         shift_start_q = input('Are they working the entire day? Please enter Y or N.')
@@ -410,15 +474,36 @@ def add_an_employee(employee_list, p_start, p_end, ):
         employee_list.append(current) 
     if current.get_name() == "Lead": #Leads don't get breaks in this program
         current.set_break_status(True)
+
+    # If they al;ready had abreak, they don't need a break
+    if break_status:
+        current.set_break_status(True)
+        current.set_break_end(break_end)
+
+    # Set variables
+    ride.set_employee_list(employee_list)
+    ride.set_break_list(break_list)
+    ride.make_break_list()
     return current
 """
 Completely removes all traces of an employee in the program. Takes them out of pos dict, off the break list, 
 and out of the employee list. NOTE: pos dict in this context is whatever dictionary the employee is in
 """
-def obliterate_employee(employee_list, break_list, pos_dict, employee_name):
+def obliterate_employee(ride, employee_name):
+    # Get variables
+    employee_list = ride.get_employee_list()
+    pos_dict = ride.get_pos_dict()
+    break_list = ride.get_break_list()
+    opt_pos_dict = ride.get_optional_pos_dict()
+
     employee_object = find_employee_in_list(employee_list, employee_name) #Locate the employee
     employee_position = employee_object.get_pos()
-    pos_dict[employee_position][0] = None #Set the position to none in the dictionary
+    try:
+        pos_dict[employee_position][0] = None #Set the position to none in the dictionary
+        location = 'pos_dict'
+    except:
+        opt_pos_dict[employee_position][0] = None
+        location = 'opt_pos_dict'
     employee_list.remove(employee_object) #Get the object out of the list
     
     try:
@@ -426,12 +511,25 @@ def obliterate_employee(employee_list, break_list, pos_dict, employee_name):
     except ValueError:
         pass #The employee is not in the break list to begin with
 
+    # Set variables
+    ride.set_break_list(break_list)
+    ride.set_pos_dict(pos_dict)
+    ride.set_employee_list(employee_list)
+    ride.set_optional_pos_dict(opt_pos_dict)
+
+    return break_list, pos_dict, opt_pos_dict, employee_list, location
+
 """
 This is a helper function to complete an entire swap or position change
 If you want to set, use two name as None and the position you want to set as position_to_set
 If you want to swap, use position_to_set as None
 """
-def change_position(employee_list, pos_dict, optional_pos_dict, one_name, two_name, position_to_set):
+def change_position(ride, one_name, two_name, position_to_set):
+    # Get everything we need
+    employee_list = ride.get_employee_list()
+    pos_dict = ride.get_pos_dict()
+    optional_pos_dict = ride.get_optional_pos_dict()
+
     if two_name == None:
         #This isnt a swap, it is a set
         employee_one = find_employee_in_list(employee_list, one_name) #Get the employee object
@@ -468,12 +566,17 @@ def change_position(employee_list, pos_dict, optional_pos_dict, one_name, two_na
             pos_dict[employee_two_position][0] = one_name
         else:
             optional_pos_dict[employee_two_position][0] = one_name
+    # Set everything we changed
+    ride.set_employee_list(employee_list)
+    ride.set_optional_pos_dict(optional_pos_dict)
+    ride.set_pos_dict(pos_dict)
 
 """
 This is a helper function to print the employee info 
 Everything yuou need to know about people is in here
 """
-def print_employee_list(employee_list):
+def print_employee_list(ride):
+    employee_list = ride.get_employee_list()
     print ("name - break - wStart - wEnd - position")
     for employee in employee_list:
         return_string = employee.get_name() + "-"

@@ -50,10 +50,18 @@ def main():
 
         employee_list.append(current)
     
-    break_list = red_tag.make_break_list(employee_list, number_positions)
-    position_availability = red_tag.calculate_position_availability(employee_list, ride)
+    # Add the employee list to the ride object
+    ride.set_employee_list(employee_list)
 
-    red_tag.rotate(employee_list, ride, position_availability, True)
+    # Create the break list on the ride object
+    ride.make_break_list()
+
+    # Calculate the position availability on the ride object
+    ride.calculate_position_availability()
+
+    # TODO Check initial training here
+
+    red_tag.rotate(ride, True)
     red_tag.print_ride(ride)
 
     #Prepare to enter main loop
@@ -92,7 +100,7 @@ def main():
 
                 
                 # Find the employee object 
-                employee_object = red_tag.find_employee_in_list(employee_list,  employee_name)
+                employee_object = red_tag.find_employee_in_list(ride.get_employee_list(),  employee_name)
                 if employee_object == None:
                     print ('Employee not found')
                     continue
@@ -109,47 +117,30 @@ def main():
                     print (f'{employee_name} has been succesfully trained at {position}')
         elif command == 'e':
             #Print out the full detailed employee list
-            red_tag.print_employee_list(employee_list)
+            red_tag.print_employee_list(ride)
         elif command == 'n':
-            print_rotation_result = red_tag.next_rotation(employee_list, ride, break_list, p_start, p_end, position_availability)
-            try:
-                if print_rotation_result[0]:
-                    break_list = print_rotation_result[1]
-                red_tag.print_ride(ride)
-            except:
-                continue
+            print_rotation_result = red_tag.next_rotation(ride, p_start, p_end)
+            red_tag.print_ride(ride)
         elif command == 'r':
             confirm = input("Are you sure you want to proceed? This will delete all data. Type 'yes' to restart or press any key to continue this run")
             if confirm.lower() == "yes":
                 print ("\n" *10)
                 main()
         elif command == "+":
+
             #Create a new guy and add him to the break list
-            new_guy = red_tag.add_an_employee(employee_list, p_start, p_end)
-            break_list.append(new_guy)
-            break_list = red_tag.make_break_list(break_list, len(break_list))
+            new_guy = red_tag.add_an_employee(ride, p_start, p_end)
+
 
             print(new_guy.get_name() , "has been added, but we need a position for them to occupy.")
             #Create a new optional position and set this fellas position to the new position
-            name = ride.add_optional_pos()
-            ride.get_optional_pos_dict()[name][0] = new_guy.get_name()
+            name = ride.add_pos()
+
+            opt_pos_dict = ride.get_optional_pos_dict()
+            opt_pos_dict[name][0] = new_guy.get_name()
+            ride.set_optional_pos_dict(opt_pos_dict)
             new_guy.set_pos(name)
 
-            #If the new guy has already had break, adjust
-            break_answer = ''
-            if break_answer.lower() != 'y' and break_answer.lower() != 'n':
-                break_answer = input("Has " + new_guy.get_name() + " had a break yet? Please enter y or n: ")
-            if break_answer.lower() == 'y':
-                time_answer = ''
-                while (len(time_answer.split()))!= 2:
-                    time_answer = input("What time did the break end? Enter in the form HH:MM")
-                time_tokens = time_answer.split(':') 
-                new_guy.set_break_status(True)
-                new_guy.set_break_end(red_tag_classes.Time(time_tokens[0], time_tokens[1]))
-            elif break_answer.lower() == 'n':
-                print("Employee has been added successfully")
-            else:
-                print ("Inavalid input - continuing under the assumption that the break has not occured.")
 
         elif command == "-":
             if (len(employee_list) == ride.get_mins()):
@@ -163,7 +154,7 @@ def main():
                     remove_employees_position = remove_employee.get_pos()
                     for pos in ride.get_pos_dict():
                         if pos == remove_employees_position:
-                            red_tag.obliterate_employee(employee_list, break_list, ride.get_pos_dict(), remove_employee.get_name())
+                            red_tag.obliterate_employee(ride, remove_employee.get_name())
                             cont = True
                             break
                     for optional_pos in ride.get_optional_pos_dict():
@@ -214,7 +205,7 @@ def main():
         elif command == 't':
             print (red_tag_test_utils.test_dict_list_match(employee_list, ride.get_pos_dict(), ride.get_optional_pos_dict()))
         elif command == 'br':
-            print (break_list)
+            print (ride.get_break_list())
         else:
             print ("Command not recognised - please enter h for options")
         

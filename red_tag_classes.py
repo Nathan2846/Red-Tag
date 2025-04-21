@@ -152,7 +152,7 @@ class Ride:
     This is the ride class. It will contain field for positions, whcih will have a dict. with each position 
     mapped to a list of [current employee, lead permitted status, clerk permitted status]
     """
-    __slots__ = ['__name','__mins','__pos_dict', '__optional_pos_dict', '__current_time']
+    __slots__ = ['__name','__mins','__pos_dict', '__optional_pos_dict', '__current_time', '__employees', '__break_order', '__position_availability']
     def __init__(self, name, mins):
         self.__name = name
         self.__mins = mins
@@ -193,6 +193,8 @@ class Ride:
         else:
             self.__optional_pos_dict[name] == [None, lead_status, clerk_status]
 
+        return name
+
 
     def remove_pos(self,name):
         if name in self.__pos_dict:
@@ -215,12 +217,74 @@ class Ride:
     def get_current_time(self):
         return self.__current_time
     
+    def set_employee_list(self, employees):
+        self.__employees = employees
+
+    def get_employee_list(self):
+        return self.__employees
+    
+    def get_position_availability(self):
+        return self.__position_availability
+    
+    def set_pos_dict(self, pos_dict):
+        self.__pos_dict = pos_dict
+    
+    def set_optional_pos_dict(self, opt_pos_dict):
+        self.__optional_pos_dict = opt_pos_dict
+
+    def set_break_order (self, break_list):
+        self.__break_order = break_list
+
+    """
+    This function returns a list of all the breaks that need completed in order
+    """
+    def make_break_list(self):
+        duplicate = self.__employees.copy() #Create a duplicate of the employee list to work with
+        return_list = []
+        for _ in range(len(self._employees)):
+            max_time = Time(24,00) #A maximum time value
+            current_lowest_employee = 1 #This variable will hold the employee object with the first brak time
+            lowest_index = 0 #This will be the index of the lowest employee
+            for i in range(len(duplicate)):
+                potential_employee = duplicate[i] #The current employee
+                current_break_start = potential_employee.get_break_window()[0]
+                if current_break_start < max_time and current_break_start != Time(0,0) and not potential_employee.get_break_status(): #HEY: The break dstatus bit of this logic may need work. It is meant to skip people who have already been onb break
+                    #They need a break, and it is earlier than any other found thus far. Set all variables
+                    max_time = current_break_start
+                    current_lowest_employee = potential_employee
+                    lowest_index = i
+            if current_lowest_employee.get_name().lower() == 'lead': #TODO: Deasl with leads
+                duplicate.pop(lowest_index) #Remove the lead, we don't need to deal with them
+                continue #Continue on without adding them to the return_list
+            return_list.append(current_lowest_employee) #Add the employee onto the end of the list
+            if (len(duplicate))!= 0 :
+                #Remove the employee from the duplicate
+                duplicate.pop(lowest_index)
+
+        self.__break_order = return_list
+    
     #The following functions are used to manually create test data
     def add_to_dict(self,key, value):
         self.__pos_dict[key] = value
     def add_to_opt_dict(self, key, value):
         self.__optional_pos_dict[key] = value
     
+    def calculate_position_availability(self):
+    #Begin by getting all positions in one list
+        all_positions = list(self.__pos_dict.keys()) + list(self.__optional_pos_dict.keys())
+
+        position_availability = {}
+        # Determine List of employees for each positions. Create a dictionary where the key is the position
+        # and the value is the list of employees that can do it
+
+        for position in all_positions:
+            position_availability[position.lower()] = []
+            for employee in self.__employees:
+                if position.lower() not in employee.get_untrained_positions():
+                    position_availability[position.lower()].append(employee.get_name())
+
+        
+        self.__position_availability = position_availability
 
 """
 Tests for the time module
