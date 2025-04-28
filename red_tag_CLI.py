@@ -60,7 +60,12 @@ def main():
     ride.calculate_position_availability()
 
     # TODO Check initial training here
+    training = red_tag.training_check(ride.get_position_availability())
 
+    if not training[0]:
+        print (f'Catastrophic failure: No employees trained at position {training[1]}. Please adjust config file and run again. Exiting.')
+        exit()
+    
     red_tag.rotate(ride, True)
     red_tag.print_ride(ride)
 
@@ -143,56 +148,7 @@ def main():
 
 
         elif command == "-":
-            if (len(employee_list) == ride.get_mins()):
-                print ("You are at mins and cannot remove an employee")
-            else:
-                #You can remove an employee
-                if len(command_tokens) != 2:
-                    print ("Improper usage. Please use - <employee name>")
-                else:
-                    remove_employee = red_tag.find_employee_in_list(employee_list, command_tokens[1])
-                    remove_employees_position = remove_employee.get_pos()
-                    for pos in ride.get_pos_dict():
-                        if pos == remove_employees_position:
-                            red_tag.obliterate_employee(ride, remove_employee.get_name())
-                            cont = True
-                            break
-                    for optional_pos in ride.get_optional_pos_dict():
-                        if optional_pos == remove_employees_position:
-                            red_tag.obliterate_employee(employee_list, break_list, ride.get_optional_pos_dict(), remove_employee.get_name())
-                            del ride.get_optional_pos_dict()[optional_pos]
-                            cont = False
-                            break
-
-                    #At this point the employee has been obliterated - lets fill the position with someone from optional
-                    if cont:
-                        print ("Please select the option you would like removed by entering the number in brackets after it is listed")
-                        i = 0
-                        optional_position_list = []
-                        for optional_position in ride.get_optional_pos_dict():
-                            print (optional_position, '[', i, ']', end=" --- ")
-                            i += 1
-                            optional_position_list.append(optional_position)
-
-                        while True:
-                            try:
-                                choice = int(input("Please enter your choice now:"))
-                                if choice >= len(optional_position_list):
-                                    print('Please enter an index within range')
-                                    continue
-                                break
-                            except ValueError:
-                                print ("Please enter a number")
-                        
-
-                        position =  optional_position_list[choice]
-                        employee_name_covering = ride.get_optional_pos_dict()[position][0]
-
-                        if employee_name_covering != None:
-                            employee_covering = red_tag.find_employee_in_list(employee_list, employee_name_covering)
-                            employee_covering.set_pos(remove_employees_position)
-                        ride.get_pos_dict()[remove_employees_position][0] = employee_name_covering
-                        del ride.get_optional_pos_dict()[position]
+            red_tag.remove_employee(ride, command_tokens)
         elif command == 'f':
             if len(command_tokens) != 2:
                 print ("Improper usage. Please use the format 'f <employee name>")

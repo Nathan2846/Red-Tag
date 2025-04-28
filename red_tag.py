@@ -20,8 +20,8 @@ def training_check (position_availability, person = None):
     if person == None:
         for position in position_availability:
             if len(position_availability[position]) == 0:
-                return False
-        return True
+                return [False, position]
+        return [True]
     
     # Otherwise, let's check what will happen if we get rid of "person"
     result = {1: [], 2: [], 'other': []}
@@ -736,6 +736,70 @@ def adjustments(rotation_dict, max_possible):
                 index += 1
     return [True] #If we get the breaks down far enough to exit the while loop, we cna return True
 
+def remove_employee(ride, command_tokens):
+    # Get values
+    employee_list = ride.get_employee_list()
+    break_list = ride.get_break_list()
+    pos_dict = ride.get+pos_dict()
+    opt_pos_dict = ride.get_opt_pos_dict()
+    if (len(employee_list) == ride.get_mins()):
+        print ("You are at mins and cannot remove an employee")
+    else:
+    #You can remove an employee
+        if len(command_tokens) != 2:
+            print ("Improper usage. Please use - <employee name>")
+        else:
+            remove_employee = find_employee_in_list(employee_list, command_tokens[1])
+            remove_employees_position = remove_employee.get_pos()
+            for pos in pos_dict:
+                if pos == remove_employees_position:
+                    obliterate_employee(ride, remove_employee.get_name())
+                    cont = True
+                    break
+            for optional_pos in opt_pos_dict:
+                if optional_pos == remove_employees_position:
+                    obliterate_employee(employee_list, break_list, opt_pos_dict, remove_employee.get_name())
+                    del opt_pos_dict[optional_pos]
+                    cont = False
+                    break
+
+        #At this point the employee has been obliterated - lets fill the position with someone from optional
+        if cont:
+            print ("Please select the option you would like removed by entering the number in brackets after it is listed")
+            i = 0
+            optional_position_list = []
+            for optional_position in opt_pos_dict:
+                print (optional_position, '[', i, ']', end=" --- ")
+                i += 1
+                optional_position_list.append(optional_position)
+
+            while True:
+                try:
+                    choice = int(input("Please enter your choice now:"))
+                    if choice >= len(optional_position_list):
+                        print('Please enter an index within range')
+                        continue
+                    break
+                except ValueError:
+                    print ("Please enter a number")
+            
+
+            position =  optional_position_list[choice]
+            employee_name_covering = ride.opt_pos_dict[position][0]
+
+            if employee_name_covering != None:
+                employee_covering = find_employee_in_list(employee_list, employee_name_covering)
+                employee_covering.set_pos(remove_employees_position)
+            ride.pos_dict[remove_employees_position][0] = employee_name_covering
+            del ride.opt_pos_dict[position]
+
+    # Set all variables
+    ride.set_break_list(break_list)
+    ride.se_employee_list(employee_list)
+    ride.set_pos_dict(pos_dict)
+    ride.set_optional_pos_dict(opt_pos_dict)
+
+    return break_list, employee_list, pos_dict, opt_pos_dict
 def main():
     red_tag_CLI.main()
             
