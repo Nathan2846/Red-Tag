@@ -160,12 +160,19 @@ def next_rotation(ride, p_start, p_end):
 
     #First priority is to send people home if needed
     #TODO: Add training check logic to this function
-    send_people_home_result = send_people_home(employee_list, ride, break_list, p_start, p_end, position_availability)
+    send_people_home_result = new_send_people_home(ride, p_start, p_end)
+
+    #TODO: Resume work here for rotation. Keep in mind that all variables should be re-pulled. Keep in mind that some employees who have just been added do not have positions
     if send_people_home_result[0]:
         break_list = send_people_home_result[1] #Update the break list if needed from the send_people_home function
     
     #Perform feasibility check - determines if there are any violations
     #TODO: Add logic to feasibility check to make sure you aren't sending home/on break the one person who is trained at a position
+    # Actually, we don't care about this here. We should care about this later, when we try to send home the first person on the break list
+    # However, we should change the training check to notify people eevery rotation if there are positions where there are only 1 person trained
+    # Doin't need to notify about positions with 0, because that is handled by CLI
+    # Make sure to adjust function calls throughout for 'verbose' parameter
+    #  
     feasibility_result = feasibility_check(employee_list, break_list, pos_dict, optional_pos_dict, ride, p_start, p_end) # Does not change anything, no need to get/set thinga within the function
     if not feasibility_result[0]:
         #There will be some violations at some point
@@ -200,12 +207,13 @@ def next_rotation(ride, p_start, p_end):
     return send_people_home_result #Return this so the CLI knows if the breaks_list has changed and some employees have gone home
 
 # In progress
-def new_send_people_home (employee_list, ride, break_list, p_start, p_end, position_availability):
-    pos_dict = ride.get_pos_dict()
+def new_send_people_home (ride, p_start, p_end):
+    employee_list = ride.get_employee_list()
     opt_pos_dict = ride.get_optional_pos_dict()
     current_time = ride.get_current_time()
+    people_added = 0
 
-        #Let us now determine if any employees shift are going to end on this rotation
+    #Let us now determine if any employees shift are going to end on this rotation
     people_leaving = []
     for employee in employee_list:
         if employee.get_shift_end() < current_time or employee.get_shift_end() == current_time:
@@ -228,18 +236,97 @@ def new_send_people_home (employee_list, ride, break_list, p_start, p_end, posit
                 training[0].pop(0) # Don't care - clear them out 
             else:
                 #This is a problem - employee MUST be replaced
-                training[0] = swap(position_availability, ride, employee, training[0])
+                people_added = swap(position_availability, ride, employee, training[0], p_start, p_end) # Add one or more people
+
+
+                # Recalculate position availability and break list in the object
+                position_availability = ride.calculate_position_availability()
+                break_list = ride.make_break_list()
+
+                break # All training errors have been resolved
+
+        # Variables may have changed due to swap - grab them again
+        employee_list = ride.get_employee_list() #This is changed in add_employee function
+        position_availability = ride.get_position_availability() #This is changed in add_employee function
+        opt_pos_dict = ride.get_optional_pos_dict() # Changed if a new position is added due to 2 employees replacing the one
+        opt_pos_dict_keys = list(opt_pos_dict).keys()
+        # Training issues now resolved for this employee. Now determine if adding an employee is needed or if you can remove an optional position
+        if len(employee_list) == ride.get_mins():
+            # Gonna need a new employee
+            print (f'You are at mins and cannot send {employee.get_name()} home')
+            print ('You will now be prompted to add an employee to your ride')
+            add_an_employee(ride, p_start, p_end) # Training doesn't matter - all violations already resolved
+
+        else:
+            # We've got extra people - no need to add anyone
+
+            # If there are no optional positions, then this guy was just added and we don't need to worry about removing an optional position
+            if len(opt_pos_dict) == 0:
+                # No need to add anyone, no need to remove position. This is a 1:1 swap
+                pass
+            elif len(opt_pos_dict) == 1:
+                # Only 1 position to remove - there is no choice
+                print (f'Your {opt_pos_dict_keys[0]} will be pulled to send {employee.get_name()} home')
+                ride.remove_pos(opt_pos_dict_keys[0])
+            else:
+                # There are multiple positions which can be removed - let them chose
+                print ("\033[33mThere are multiple positions that can be removed. Please select the option you would like removed by entering the number in brackets after it is listed\033[0m")
+                i = 0
+                optional_position_list = []
+                for optional_position in opt_pos_dict: #Print out their options
+                    print (optional_position, '[', i, ']', end=" --- ")
+                    i += 1
+                    optional_position_list.append(optional_position) #Add it to the list so we can pick it using the index the user provides
+                choice = int(input("Please enter your choice now:"))
+
+
+                position = optional_position_list[choice] #The positoion we are going to remove
+                ride.remove_pos(position) # Get rid of it
+
+        # You have now either added an employee, added an employee above to resolve training, removed the only optional position, or allowed the user to remove an optional position of choice
+        # In any case, you now have 1 free man to cover the guy going home
+        print (f'{employee.get_name()} is now free to go home. Thanks for being here today!')
+        obliterate_employee(ride, employee.get_name())
+        people_added -= 1
+
+        # If you added more than the 1 person you are sending home on this iteration, you are going to need another position
+        if people_added != 0:
+            print ('You have added more than 1 person, which means you will need to create a new position')
+            print ('When prompted, indicate that this is an optional position')
+            for _ in range(people_added):
+                ride.add_pos()
+
+    # No need to re-sync to the object - already handled by the individual add and remove functions
+
+
+
 
 #In progress
-def swap(position_availability, ride, employee, violations):
+def swap(position_availability, ride, employee, violations, p_start, p_end):
+    people_added = 0
     print (f'It is time for {employee.get_name()} to go home for the day, but if they leave there will be no one left who is trained at the following positions:')
-    for p in violations:
+    for i, p in enumerate(violations):
+        
+        # Double check that there are no optional positions here
+        if p in ride.get_optional_pos_dict():
+            violations.pop(i)
         print ('\t\t',p)
     
     print ('Because these positions are not optional, you will need to add someone (or multiple people) to the ride who is/are trained at this time')
 
     # Continue adding people 
-    
+    while len(violations != 0):
+        people_added += 1
+        new_guy = add_an_employee(ride, p_start, p_end)
+        new_guy_untrained = new_guy.get_untrained_positions()
+
+        overlap = []
+        for p in new_guy_untrained:
+            if p in violations:
+                # Still no one trained there
+                overlap.append(p)
+        violations = overlap 
+    return people_added
 
 """
 This function will determine if people will need to go home in the next ROTATION_LENGTH minutes. If they do, it will prompt
@@ -484,6 +571,7 @@ def add_an_employee(ride, p_start, p_end):
     ride.set_employee_list(employee_list)
     ride.set_break_list(break_list)
     ride.make_break_list()
+    ride.calculate_position_availability()
     return current
 """
 Completely removes all traces of an employee in the program. Takes them out of pos dict, off the break list, 

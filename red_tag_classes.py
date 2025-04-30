@@ -199,6 +199,8 @@ class Ride:
     def remove_pos(self,name):
         if name in self.__pos_dict:
             self.__pos_dict.pop(name)
+        elif name in self.__opt_pos_dict:
+            self.__opt_pos_dict.pop(name)
         else:
             print ('Position not found-please try again')
     def get_pos_dict(self):
