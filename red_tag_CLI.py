@@ -124,7 +124,7 @@ def main():
             #Print out the full detailed employee list
             red_tag.print_employee_list(ride)
         elif command == 'n':
-            print_rotation_result = red_tag.next_rotation(ride, p_start, p_end)
+            red_tag.next_rotation(ride, p_start, p_end)
             red_tag.print_ride(ride)
         elif command == 'r':
             confirm = input("Are you sure you want to proceed? This will delete all data. Type 'yes' to restart or press any key to continue this run")
@@ -153,7 +153,7 @@ def main():
             if len(command_tokens) != 2:
                 print ("Improper usage. Please use the format 'f <employee name>")
             else:
-                located = red_tag.find_employee_in_list(employee_list, command_tokens[1])
+                located = red_tag.find_employee_in_list(ride.get_employee_list(), command_tokens[1])
                 if located == None:
                     print ("Employee not found, please try again")
                 else:

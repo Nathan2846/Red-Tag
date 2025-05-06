@@ -15,12 +15,16 @@ ROTATION_LENGTH = 45
 
 
 
-def training_check (position_availability, person = None):
+def training_check (position_availability, person = None, print = False):
     # If we aren't looking at a specific person, just check the whole thing
     if person == None:
         for position in position_availability:
             if len(position_availability[position]) == 0:
                 return [False, position]
+            if len(position_availability[position]) == 1:
+                # Print warning if needed
+                if print:
+                    print (f'WARNING: Only 1 person is trained at {position}')
         return [True]
     
     # Otherwise, let's check what will happen if we get rid of "person"
@@ -60,7 +64,7 @@ def rotate(ride, first):
                 break
         # Having found the position, lets deal with it
         for candidate in employee_list:
-            if ((candidate.get_pos()  == None and first) or (candidate.get_pos() != current_position and not first )) and candidate.get_name() in temp_position_availability[current_position.lower()]:
+            if ((candidate.get_pos()  == None) or (candidate.get_pos() != current_position and not first )) and candidate.get_name() in temp_position_availability[current_position.lower()]:
                 # Set them
                 change_position(ride,candidate.get_name(), None, current_position)
 
@@ -74,7 +78,7 @@ def rotate(ride, first):
                 break # Move on 
 
 
-def do_breaks(break_occuring, ride):
+def do_breaks(break_occuring, ride, unbreakable):
     # Grab/compute all the variables
     pos_dict = ride.get_pos_dict()
     optional_pos_dict = ride.get_optional_pos_dict()
@@ -92,11 +96,17 @@ def do_breaks(break_occuring, ride):
         #Lets determine who gets to go on break
         index = 0
         time = break_list[index].get_break_window()[0]
+
+        # Find the first employee that isn't unbreakable
+        while break_list[index].get_name() in unbreakable:
+            index += 1 
+
+        # Index is now at the first break that can go - lets check if a minor should hop the line 
         if (int(break_list[index].get_age()) >= 18):
-            #If the first perosn in the brak list is not a minor, make sure there is not a minor that should be going at this time
+            #If the first elligible person in the break list is not a minor, make sure there is not a minor that should be going at this time
             for j in range(len(break_list)):
 
-                if int(break_list[j].get_age()) < 18 and break_list[j].get_break_window()[0] < ride.get_current_time():
+                if int(break_list[j].get_age()) < 18 and break_list[j].get_break_window()[0] < ride.get_current_time() and break_list[j].get_name() not in unbreakable:
                     #A minor should go instead - they always have the highest priority
                     index = j
                     break
@@ -159,12 +169,17 @@ def next_rotation(ride, p_start, p_end):
                     break
 
     #First priority is to send people home if needed
-    #TODO: Add training check logic to this function
-    send_people_home_result = new_send_people_home(ride, p_start, p_end)
+    new_send_people_home(ride, p_start, p_end)
 
     #TODO: Resume work here for rotation. Keep in mind that all variables should be re-pulled. Keep in mind that some employees who have just been added do not have positions
-    if send_people_home_result[0]:
-        break_list = send_people_home_result[1] #Update the break list if needed from the send_people_home function
+    # Although, this doesn't matter, because the rotate function will just set them anyways - already designed to handle None position types
+
+    #Update local copies of variables
+    employee_list = ride.get_employee_list()
+    break_list - ride.get_break_list()
+    position_availability = ride.get_position_availability()
+    optional_pos_dict = ride.get_optional_pos_dict()
+    pos_dict = ride.get_pos_dict()
     
     #Perform feasibility check - determines if there are any violations
     #TODO: Add logic to feasibility check to make sure you aren't sending home/on break the one person who is trained at a position
@@ -172,8 +187,11 @@ def next_rotation(ride, p_start, p_end):
     # However, we should change the training check to notify people eevery rotation if there are positions where there are only 1 person trained
     # Doin't need to notify about positions with 0, because that is handled by CLI
     # Make sure to adjust function calls throughout for 'verbose' parameter
-    #  
-    feasibility_result = feasibility_check(employee_list, break_list, pos_dict, optional_pos_dict, ride, p_start, p_end) # Does not change anything, no need to get/set thinga within the function
+    
+    # Call the training check first to print any warnings here
+    training_check(ride.get_position_availability(), None, True)
+
+    feasibility_result = feasibility_check(employee_list, break_list, pos_dict, optional_pos_dict, ride, p_start, p_end) # Does not change anything, no need to get/set things within the function
     if not feasibility_result[0]:
         #There will be some violations at some point
         print ('\033[31m' , 'WARNING:', '\033[0m', 'violation expected at', feasibility_result[3])
@@ -182,13 +200,25 @@ def next_rotation(ride, p_start, p_end):
         print ('\033[32m', 'No violations found!', '\033[0m')
 
     #Second priority is to send people on break if it is possible to do so. This will determine if it is possible
+
+    # Lets first get a list of everyone who is the only one trained at their position. If they are the only one, they can't break no matter what
+    unbreakable = {}
+    for employee in employee_list:
+        report = training_check(position_availability, employee.get_name())
+        if (len(report[1])) != 0:
+            # This person is unbreakable
+            unbreakable[employee.get_name()] = report[1]
+
     pop_lead = [0, False]
     break_occuring = 0 #We start with no breaks occuring
     for i in range(len(break_list)):
         if (ride.get_current_time() > break_list[i].get_break_window()[0]  or ride.get_current_time() == break_list[i].get_break_window()[0]) and break_list[i].get_name() != "Lead":
             #The time is equal to or later than someones break window, and that person is not the lead. They may be able to brak
             if len(optional_pos_dict) > break_occuring:
-                #We can do a break
+                #We can do a break if they aren't unbreakable
+                if break_list[i].get_name() in unbreakable:
+                    # So close but no break for you
+                    print (f' WARNING: It is time for {employee.get_name()} to go on break, but they cannot because they are the onlye on trained at {unbreakable[employee.get_name()]}. Attemptiong to break other employees instead')
                 break_occuring+=1
         elif ride.get_current_time() > break_list[i].get_break_window()[0] and break_list[i].get_name() == "Lead":
             pop_lead = [True, i] #It is time for the leads break, but the program doesn't worry about that
@@ -199,14 +229,13 @@ def next_rotation(ride, p_start, p_end):
 
     #If it is possible, send the person on break and remove the from the break list
     if break_occuring >0:
-       pos_dict, optional_pos_dict, break_list = do_breaks(break_occuring, ride)
+       pos_dict, optional_pos_dict, break_list = do_breaks(break_occuring, ride, unbreakable)
 
 
     rotate(ride, False)
 
-    return send_people_home_result #Return this so the CLI knows if the breaks_list has changed and some employees have gone home
 
-# In progress
+
 def new_send_people_home (ride, p_start, p_end):
     employee_list = ride.get_employee_list()
     opt_pos_dict = ride.get_optional_pos_dict()
@@ -300,8 +329,6 @@ def new_send_people_home (ride, p_start, p_end):
 
 
 
-
-#In progress
 def swap(position_availability, ride, employee, violations, p_start, p_end):
     people_added = 0
     print (f'It is time for {employee.get_name()} to go home for the day, but if they leave there will be no one left who is trained at the following positions:')
@@ -709,8 +736,6 @@ May also note if this will require squtching positions within a rotation
 Returns in the form [True/False, number of breaks, number of extras, time of earliest violation ]
 """
 def feasibility_check(employee_list, break_list, pos_dict, optional_pos_dict, ride, p_start, p_end):
-
-    
     minor_breaks = [] #A list of all the minor breaks - minors are thre only ones who can violate
     for employee in break_list:
         if int(employee.get_age()) < 18 and not employee.get_break_status():
