@@ -139,7 +139,7 @@ def do_breaks(break_occuring, ride, unbreakable):
 def next_rotation(ride, p_start, p_end):
     # Get variables
     employee_list = ride.get_employee_list()
-    break_list - ride.get_break_list()
+    break_list = ride.get_break_list()
     position_availability = ride.get_position_availability()
     optional_pos_dict = ride.get_optional_pos_dict()
     pos_dict = ride.get_pos_dict()
@@ -176,7 +176,7 @@ def next_rotation(ride, p_start, p_end):
 
     #Update local copies of variables
     employee_list = ride.get_employee_list()
-    break_list - ride.get_break_list()
+    break_list = ride.get_break_list()
     position_availability = ride.get_position_availability()
     optional_pos_dict = ride.get_optional_pos_dict()
     pos_dict = ride.get_pos_dict()
@@ -549,6 +549,10 @@ def add_an_employee(ride, p_start, p_end):
             break
         except ValueError:
             print('\033[31m Please enter a value \033[0m')
+    
+    # Determine if they are a lead
+    lead_status = input (f'Is {name} a lead? Plase enter y or n:')
+    lead_status = lead_status.lower() == 'y'
 
     # Determine if they already had a break
     break_answer = ''
@@ -556,7 +560,7 @@ def add_an_employee(ride, p_start, p_end):
         break_answer = input("Has " + name + " had a break yet? Please enter y or n: ")
     if break_answer.lower() == 'y':
         time_answer = ''
-        while (len(time_answer.split()))!= 2:
+        while (len(time_answer.split(':')))!= 2:
             time_answer = input("What time did the break end? Enter in the form HH:MM")
         time_tokens = time_answer.split(':') 
         break_status = True
@@ -568,7 +572,7 @@ def add_an_employee(ride, p_start, p_end):
         shift_start_q = input('Are they working the entire day? Please enter Y or N.')
     if shift_start_q == 'Y' or shift_start_q == 'y':
         #Creates an employee object with shift time half hour before open to half hour past close
-        current = red_tag_classes.Employee(name, age, p_start.subtract(red_tag_classes.Time(0,30)), p_end.add(red_tag_classes.Time(0,30)))
+        current = red_tag_classes.Employee(name, age, p_start.subtract(red_tag_classes.Time(0,30)), p_end.add(red_tag_classes.Time(0,30)), lead_status)
         employee_list.append(current)
     else:
         #Idiot check loop to make sure they enter times in the form HH:MM
@@ -584,7 +588,7 @@ def add_an_employee(ride, p_start, p_end):
         e_end = red_tag_classes.Time(int(e_end[0]), int(e_end[1]))
 
         #Create the employee object and add them to the employee list
-        current = red_tag_classes.Employee(name, age, e_start, e_end) 
+        current = red_tag_classes.Employee(name, age, e_start, e_end, lead_status) 
         employee_list.append(current) 
     if current.get_name() == "Lead": #Leads don't get breaks in this program
         current.set_break_status(True)
@@ -594,9 +598,18 @@ def add_an_employee(ride, p_start, p_end):
         current.set_break_status(True)
         current.set_break_end(break_end)
 
+    # Determine untrained positions
+    untrained_positions = []
+    while True:
+        position = input (f'Please enter a position that {name} is not trained at, one position at a time. Press enter to finish:')
+        if len(position) == 0:
+            break
+        else:
+            untrained_positions.append(position.lower())
+
+    current.set_untrained_positions(untrained_positions)
     # Set variables
     ride.set_employee_list(employee_list)
-    ride.set_break_list(break_list)
     ride.make_break_list()
     ride.calculate_position_availability()
     return current

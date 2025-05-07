@@ -112,7 +112,7 @@ class Employee:
         return result
 
     def __str__(self):
-        a_string = self.__name + ':' + str(self.__pos) + ':' + self.__age + ':' + str(self.__break_status)
+        a_string = self.__name + ':' + str(self.__pos) + ':' + str(self.__age) + ':' + str(self.__break_status)
         return a_string
     def set_pos(self,position):
         self.__pos = position
@@ -191,7 +191,7 @@ class Ride:
         if mandatory:
             self.__pos_dict[name] = [None, lead_status, clerk_status]
         else:
-            self.__optional_pos_dict[name] == [None, lead_status, clerk_status]
+            self.__optional_pos_dict[name] = [None, lead_status, clerk_status]
 
         return name
 
@@ -243,9 +243,15 @@ class Ride:
     def make_break_list(self):
         duplicate = self.__employees.copy() #Create a duplicate of the employee list to work with
         return_list = []
-        for _ in range(len(self._employees)):
+
+        # Figure out how many have already done break
+        breaks_done = 0
+        for employee in duplicate:
+            if employee.get_break_status():
+                breaks_done += 1
+        for _ in range(len(self.__employees) - breaks_done):
             max_time = Time(24,00) #A maximum time value
-            current_lowest_employee = 1 #This variable will hold the employee object with the first brak time
+            current_lowest_employee = 1 #This variable will hold the employee object with the first break time
             lowest_index = 0 #This will be the index of the lowest employee
             for i in range(len(duplicate)):
                 potential_employee = duplicate[i] #The current employee
@@ -266,6 +272,8 @@ class Ride:
         self.__break_order = return_list
     
     #The following functions are used to manually create test data
+    def get_break_list(self):
+        return self.__break_order
     def add_to_dict(self,key, value):
         self.__pos_dict[key] = value
     def add_to_opt_dict(self, key, value):

@@ -158,10 +158,10 @@ def main():
                     print ("Employee not found, please try again")
                 else:
                     print(repr(located))
-        elif command == 't':
+        elif command == 'test':
             print (red_tag_test_utils.test_dict_list_match(employee_list, ride.get_pos_dict(), ride.get_optional_pos_dict()))
-        elif command == 'br':
-            print (ride.get_break_list())
+        elif command == 'read':
+            red_tag_test_utils.full_readout(ride)
         else:
             print ("Command not recognised - please enter h for options")
         
