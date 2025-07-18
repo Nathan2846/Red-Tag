@@ -221,6 +221,10 @@ class Ride:
     
     def set_employee_list(self, employees):
         self.__employees = employees
+    
+    def print_employee_list_names(self, employee_list):
+        for e in employee_list:
+            print (e.get_name())
 
     def get_employee_list(self):
         return self.__employees

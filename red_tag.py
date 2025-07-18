@@ -127,7 +127,7 @@ def do_breaks(break_occuring, ride, unbreakable):
 
         # Save them to ride object
         ride.set_optional_pos_dict(optional_pos_dict)
-        ride.set_break_list(break_list)
+        ride.set_break_order(break_list)
         ride.set_pos_dict(pos_dict)
 
 
@@ -533,7 +533,8 @@ def send_people_home(employee_list, ride, break_list, p_start, p_end, position_a
 def add_an_employee(ride, p_start, p_end):
     # Get variables
     employee_list = ride.get_employee_list()
-    break_list = ride.get_break_list()
+
+    # print ("Employee list at start", employee_list)
     #Create a new Employee object. This function does NOT add them to the break list or recalculate it if necessary
 
     #Idiot loop to make sutre the name has no spaces
@@ -610,6 +611,7 @@ def add_an_employee(ride, p_start, p_end):
     current.set_untrained_positions(untrained_positions)
     # Set variables
     ride.set_employee_list(employee_list)
+    # print ("New employee list", employee_list)
     ride.make_break_list()
     ride.calculate_position_availability()
     return current
@@ -621,7 +623,6 @@ def obliterate_employee(ride, employee_name):
     # Get variables
     employee_list = ride.get_employee_list()
     pos_dict = ride.get_pos_dict()
-    break_list = ride.get_break_list()
     opt_pos_dict = ride.get_optional_pos_dict()
 
     employee_object = find_employee_in_list(employee_list, employee_name) #Locate the employee
@@ -634,18 +635,18 @@ def obliterate_employee(ride, employee_name):
         location = 'opt_pos_dict'
     employee_list.remove(employee_object) #Get the object out of the list
     
-    try:
-        break_list.remove(employee_object) #Remove the employee from the break list if they needed one
-    except ValueError:
-        pass #The employee is not in the break list to begin with
+
+
 
     # Set variables
-    ride.set_break_list(break_list)
+
     ride.set_pos_dict(pos_dict)
     ride.set_employee_list(employee_list)
     ride.set_optional_pos_dict(opt_pos_dict)
+    ride.make_break_list()
+    ride.calculate_position_availability()
 
-    return break_list, pos_dict, opt_pos_dict, employee_list, location
+    return ride.get_break_list(), pos_dict, opt_pos_dict, employee_list, location
 
 """
 This is a helper function to complete an entire swap or position change
@@ -866,8 +867,8 @@ def remove_employee(ride, command_tokens):
     # Get values
     employee_list = ride.get_employee_list()
     break_list = ride.get_break_list()
-    pos_dict = ride.get+pos_dict()
-    opt_pos_dict = ride.get_opt_pos_dict()
+    pos_dict = ride.get_pos_dict()
+    opt_pos_dict = ride.get_optional_pos_dict()
     if (len(employee_list) == ride.get_mins()):
         print ("You are at mins and cannot remove an employee")
     else:
@@ -877,55 +878,70 @@ def remove_employee(ride, command_tokens):
         else:
             remove_employee = find_employee_in_list(employee_list, command_tokens[1])
             remove_employees_position = remove_employee.get_pos()
-            for pos in pos_dict:
-                if pos == remove_employees_position:
-                    obliterate_employee(ride, remove_employee.get_name())
-                    cont = True
-                    break
-            for optional_pos in opt_pos_dict:
-                if optional_pos == remove_employees_position:
-                    obliterate_employee(employee_list, break_list, opt_pos_dict, remove_employee.get_name())
-                    del opt_pos_dict[optional_pos]
-                    cont = False
-                    break
 
-        #At this point the employee has been obliterated - lets fill the position with someone from optional
-        if cont:
-            print ("Please select the option you would like removed by entering the number in brackets after it is listed")
-            i = 0
-            optional_position_list = []
-            for optional_position in opt_pos_dict:
-                print (optional_position, '[', i, ']', end=" --- ")
-                i += 1
-                optional_position_list.append(optional_position)
+            # Obliterate and get new local variables
+            print(opt_pos_dict)
+            break_list, pos_dict, opt_pos_dict, employee_list, location = obliterate_employee(ride, remove_employee.get_name())
 
-            while True:
-                try:
-                    choice = int(input("Please enter your choice now:"))
-                    if choice >= len(optional_position_list):
-                        print('Please enter an index within range')
-                        continue
-                    break
-                except ValueError:
-                    print ("Please enter a number")
-            
 
-            position =  optional_position_list[choice]
-            employee_name_covering = ride.opt_pos_dict[position][0]
+            cont = location == 'pos_dict'
+            print(opt_pos_dict)
+            print (cont, location)
+            print (opt_pos_dict)
+             #ride.get_break_list(), pos_dict, opt_pos_dict, employee_list, location
 
-            if employee_name_covering != None:
-                employee_covering = find_employee_in_list(employee_list, employee_name_covering)
-                employee_covering.set_pos(remove_employees_position)
-            ride.pos_dict[remove_employees_position][0] = employee_name_covering
-            del ride.opt_pos_dict[position]
+            # for pos in pos_dict:
+            #     if pos == remove_employees_position:
+            #         obliterate_employee(ride, remove_employee.get_name())
+            #         cont = True
+            #         break
+            # for optional_pos in opt_pos_dict:
+            #     if optional_pos == remove_employees_position:
+            #         obliterate_employee(ride, remove_employee.get_name())
+            #         del opt_pos_dict[optional_pos]
+            #         cont = False
+            #         break
 
-    # Set all variables
-    ride.set_break_list(break_list)
-    ride.se_employee_list(employee_list)
-    ride.set_pos_dict(pos_dict)
-    ride.set_optional_pos_dict(opt_pos_dict)
+            #At this point the employee has been obliterated - lets fill the position with someone from optional
+            if cont:
+                # When you add the training check here, re-write this so that it doesn't bother if there's only 1 optional position
+                print ("Please select the option you would like removed by entering the number in brackets after it is listed")
+                i = 0
+                optional_position_list = []
+                for optional_position in opt_pos_dict:
+                    print (optional_position, '[', i, ']', end=" --- ")
+                    i += 1
+                    optional_position_list.append(optional_position)
 
-    return break_list, employee_list, pos_dict, opt_pos_dict
+                while True:
+                    try:
+                        choice = int(input("Please enter your choice now:"))
+                        if choice >= len(optional_position_list):
+                            print('Please enter an index within range')
+                            continue
+                        break
+                    except ValueError:
+                        print ("Please enter a number")
+                
+
+                position =  optional_position_list[choice]
+                employee_name_covering = opt_pos_dict[position][0]
+
+                if employee_name_covering != None:
+                    employee_covering = find_employee_in_list(employee_list, employee_name_covering)
+                    employee_covering.set_pos(remove_employees_position)
+                pos_dict[remove_employees_position][0] = employee_name_covering
+                del opt_pos_dict[position]
+            else:
+                # Gotta get ride of the optional posityion just vacated
+                del opt_pos_dict[remove_employees_position]
+        # Set all variables
+        ride.set_employee_list(employee_list)
+        ride.set_pos_dict(pos_dict)
+        ride.set_optional_pos_dict(opt_pos_dict)
+        ride.make_break_list()
+
+        return break_list, employee_list, pos_dict, opt_pos_dict
 def main():
     red_tag_CLI.main()
             

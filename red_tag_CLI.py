@@ -135,8 +135,6 @@ def main():
 
             #Create a new guy and add him to the break list
             new_guy = red_tag.add_an_employee(ride, p_start, p_end)
-
-
             print(new_guy.get_name() , "has been added, but we need a position for them to occupy.")
             #Create a new optional position and set this fellas position to the new position
             name = ride.add_pos()
@@ -146,9 +144,11 @@ def main():
             ride.set_optional_pos_dict(opt_pos_dict)
             new_guy.set_pos(name)
 
+            red_tag.print_ride(ride)
 
         elif command == "-":
             red_tag.remove_employee(ride, command_tokens)
+            red_tag.print_ride(ride)
         elif command == 'f':
             if len(command_tokens) != 2:
                 print ("Improper usage. Please use the format 'f <employee name>")
